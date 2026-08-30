@@ -1,0 +1,8 @@
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test",
+  "user": {
+    "id": "usr_login_001",
+    "name": "Armando",
+    "email": "armando@example.com"
+  }
+}

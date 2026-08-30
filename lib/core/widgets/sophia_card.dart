@@ -114,7 +114,10 @@ class _SophiaCardState extends State<SophiaCard>
                         ),
                       ],
                     ),
-                    child: widget.child,
+                    child: Material(
+                      type: MaterialType.transparency,
+                      child: widget.child,
+                    ),
                   ),
                 ),
               ),

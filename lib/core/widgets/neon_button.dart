@@ -52,9 +52,10 @@ class _NeonButtonState extends State<NeonButton>
       duration: const Duration(milliseconds: 150),
     );
     _glowAnimation = Tween<double>(begin: 0.3, end: 0.6).animate(_controller);
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
@@ -107,9 +108,9 @@ class _NeonButtonState extends State<NeonButton>
                           colors: [
                             buttonColor,
                             buttonColor.withValues(
-                              red: (buttonColor.red * 0.8).clamp(0, 1),
-                              green: (buttonColor.green * 0.8).clamp(0, 1),
-                              blue: (buttonColor.blue * 0.8).clamp(0, 1),
+                              red: (buttonColor.r * 0.8).clamp(0, 1),
+                              green: (buttonColor.g * 0.8).clamp(0, 1),
+                              blue: (buttonColor.b * 0.8).clamp(0, 1),
                             ),
                           ],
                           begin: Alignment.topLeft,

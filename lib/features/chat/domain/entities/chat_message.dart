@@ -1,4 +1,10 @@
-enum MessageType { text, scheduleConflict, mapLocation, audioWave, actionProposal }
+enum MessageType {
+  text,
+  scheduleConflict,
+  mapLocation,
+  audioWave,
+  actionProposal,
+}
 
 class ChatMessage {
   final String id;
@@ -7,7 +13,7 @@ class ChatMessage {
   final MessageType type;
   final DateTime timestamp;
   final Map<String, dynamic>?
-      metadata; // Para datos extra (ej: coordenadas del mapa, acciones propuestas)
+  metadata; // Para datos extra (ej: coordenadas del mapa, acciones propuestas)
 
   const ChatMessage({
     required this.id,

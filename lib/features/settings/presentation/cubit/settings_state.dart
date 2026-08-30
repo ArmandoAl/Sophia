@@ -25,7 +25,8 @@ class SettingsState extends Equatable {
     return SettingsState(
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
       darkModeEnabled: darkModeEnabled ?? this.darkModeEnabled,
-      voiceAssistantEnabled: voiceAssistantEnabled ?? this.voiceAssistantEnabled,
+      voiceAssistantEnabled:
+          voiceAssistantEnabled ?? this.voiceAssistantEnabled,
       language: language ?? this.language,
       voiceVolume: voiceVolume ?? this.voiceVolume,
     );
@@ -33,10 +34,10 @@ class SettingsState extends Equatable {
 
   @override
   List<Object> get props => [
-        notificationsEnabled,
-        darkModeEnabled,
-        voiceAssistantEnabled,
-        language,
-        voiceVolume,
-      ];
+    notificationsEnabled,
+    darkModeEnabled,
+    voiceAssistantEnabled,
+    language,
+    voiceVolume,
+  ];
 }

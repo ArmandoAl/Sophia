@@ -5,47 +5,44 @@ class SophiaPageTransition extends PageRouteBuilder {
   final Widget page;
 
   SophiaPageTransition({required this.page})
-      : super(
-          pageBuilder: (context, animation, secondaryAnimation) => page,
-          transitionDuration: const Duration(milliseconds: 400),
-          reverseTransitionDuration: const Duration(milliseconds: 400),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            // Curva suave para la animación
-            final curvedAnimation = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeInOutCubic,
-            );
+    : super(
+        pageBuilder: (context, animation, secondaryAnimation) => page,
+        transitionDuration: const Duration(milliseconds: 400),
+        reverseTransitionDuration: const Duration(milliseconds: 400),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          // Curva suave para la animación
+          final curvedAnimation = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeInOutCubic,
+          );
 
-            // Fade in/out
-            final fadeAnimation = Tween<double>(
-              begin: 0.0,
-              end: 1.0,
-            ).animate(curvedAnimation);
+          // Fade in/out
+          final fadeAnimation = Tween<double>(
+            begin: 0.0,
+            end: 1.0,
+          ).animate(curvedAnimation);
 
-            // Slide sutil desde abajo
-            final slideAnimation = Tween<Offset>(
-              begin: const Offset(0.0, 0.03),
-              end: Offset.zero,
-            ).animate(curvedAnimation);
+          // Slide sutil desde abajo
+          final slideAnimation = Tween<Offset>(
+            begin: const Offset(0.0, 0.03),
+            end: Offset.zero,
+          ).animate(curvedAnimation);
 
-            // Scale sutil
-            final scaleAnimation = Tween<double>(
-              begin: 0.97,
-              end: 1.0,
-            ).animate(curvedAnimation);
+          // Scale sutil
+          final scaleAnimation = Tween<double>(
+            begin: 0.97,
+            end: 1.0,
+          ).animate(curvedAnimation);
 
-            return FadeTransition(
-              opacity: fadeAnimation,
-              child: SlideTransition(
-                position: slideAnimation,
-                child: ScaleTransition(
-                  scale: scaleAnimation,
-                  child: child,
-                ),
-              ),
-            );
-          },
-        );
+          return FadeTransition(
+            opacity: fadeAnimation,
+            child: SlideTransition(
+              position: slideAnimation,
+              child: ScaleTransition(scale: scaleAnimation, child: child),
+            ),
+          );
+        },
+      );
 }
 
 /// Animación de transición compartida para StatefulShellRoute

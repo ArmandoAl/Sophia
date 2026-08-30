@@ -278,3 +278,14 @@ features/system/
 | Pantallas de contrato | ~30 | ~5 shells UI | ~25 nuevas o adaptaciones fuertes |
 
 **Conclusión:** el gap es casi total en data/domain. La UI existente cubre ~15–20% del shell visual de Fases 1/2/4; no reduce el trabajo de modelos/repos/cubits de Fase 1.
+# Update 2026-07-15
+
+Sprint V1.2 cubre el faltante principal de chat:
+
+- modelos `Conversation` y `ConversationMessage`;
+- `ConversationsRepository`;
+- `ChatMessageCubit` backend-backed;
+- `ChatPage` conectada a conversations.
+
+Pendiente para chat: selector/lista de conversaciones antiguas y flujo seguro de action proposals.
+# Update 2026-07-16: Sprint V1.3 adds real reminders models, repository and cubits. The legacy TaskItem path is removed.

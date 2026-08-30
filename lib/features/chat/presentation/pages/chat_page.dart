@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sophia_ai/core/di/service_locator.dart';
 import 'package:sophia_ai/core/widgets/neon_wrapper.dart';
 import 'package:sophia_ai/features/chat/presentation/cubit/chat_message_state.dart';
 import '../cubit/chat_message_cubit.dart';
@@ -12,13 +13,20 @@ import 'package:sophia_ai/core/widgets/voice_visualizer.dart';
 import 'package:sophia_ai/core/widgets/action_proposal_card.dart';
 
 class ChatPage extends StatelessWidget {
-  const ChatPage({super.key});
+  const ChatPage({super.key, this.cubit, this.autoLoad = true});
+
+  final ChatMessageCubit? cubit;
+  final bool autoLoad;
 
   @override
   Widget build(BuildContext context) {
     return NeonWrapper(
       child: BlocProvider(
-        create: (_) => ChatMessageCubit(),
+        create: (_) {
+          final chatCubit = cubit ?? sl<ChatMessageCubit>();
+          if (autoLoad) chatCubit.load();
+          return chatCubit;
+        },
         child: Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(
@@ -26,10 +34,13 @@ class ChatPage extends StatelessWidget {
             title: Row(
               children: [
                 const CircleAvatar(
-                  backgroundImage: NetworkImage(
-                    "https://i.pravatar.cc/150?u=sophia",
-                  ), // Sophia Avatar
+                  backgroundColor: Color(0xFF2E5CB8),
                   radius: 16,
+                  child: Icon(
+                    Icons.auto_awesome,
+                    size: 18,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Column(
@@ -70,12 +81,41 @@ class ChatPage extends StatelessWidget {
               Expanded(
                 child: BlocBuilder<ChatMessageCubit, ChatMessageState>(
                   builder: (context, state) {
+                    if (state.isLoading ||
+                        (state.conversation == null &&
+                            state.messages.isEmpty &&
+                            state.errorMessage == null)) {
+                      return const Center(
+                        key: Key('chat-loading'),
+                        child: CircularProgressIndicator(color: Colors.cyan),
+                      );
+                    }
+                    if (state.errorMessage != null && state.messages.isEmpty) {
+                      return _ChatErrorState(message: state.errorMessage!);
+                    }
+                    if (state.messages.isEmpty) {
+                      return Center(
+                        child: Text(
+                          'Start a conversation with Sophia.',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      );
+                    }
                     return ListView.builder(
                       reverse: true, // Los chats empiezan desde abajo
                       padding: const EdgeInsets.all(10),
-                      itemCount: state.messages.length,
+                      itemCount:
+                          state.messages.length +
+                          (state.errorMessage == null ? 0 : 1),
                       itemBuilder: (context, index) {
-                        final msg = state.messages[index];
+                        if (index == 0 && state.errorMessage != null) {
+                          return _InlineChatError(message: state.errorMessage!);
+                        }
+                        final msg =
+                            state.messages[index -
+                                (state.errorMessage == null ? 0 : 1)];
                         return _buildMessageItem(context, msg);
                       },
                     );
@@ -152,10 +192,13 @@ class ChatPage extends StatelessWidget {
               // Avatar para IA
               if (!isMe) ...[
                 const CircleAvatar(
-                  backgroundImage: NetworkImage(
-                    "https://i.pravatar.cc/150?u=sophia",
-                  ),
+                  backgroundColor: Color(0xFF2E5CB8),
                   radius: 14,
+                  child: Icon(
+                    Icons.auto_awesome,
+                    size: 16,
+                    color: Colors.white,
+                  ),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -250,6 +293,47 @@ class ChatPage extends StatelessWidget {
       default:
         return Colors.cyan;
     }
+  }
+}
+
+class _ChatErrorState extends StatelessWidget {
+  const _ChatErrorState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(message, style: const TextStyle(color: Colors.white70)),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () => context.read<ChatMessageCubit>().retry(),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineChatError extends StatelessWidget {
+  const _InlineChatError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextButton.icon(
+        onPressed: () => context.read<ChatMessageCubit>().retry(),
+        icon: const Icon(Icons.refresh),
+        label: Text(message),
+      ),
+    );
   }
 }
 
@@ -368,86 +452,116 @@ class _ChatInputAreaState extends State<_ChatInputArea> {
   }
 }
 
-class _GlassChatInputArea extends StatelessWidget {
+class _GlassChatInputArea extends StatefulWidget {
   const _GlassChatInputArea();
+
+  @override
+  State<_GlassChatInputArea> createState() => _GlassChatInputAreaState();
+}
+
+class _GlassChatInputAreaState extends State<_GlassChatInputArea> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _send(BuildContext context) {
+    final text = _controller.text;
+    if (text.trim().isEmpty) return;
+    context.read<ChatMessageCubit>().sendMessage(text);
+    _controller.clear();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     // Barra inferior estilo Glass
-    return ClipRRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), // Blur intenso fondo
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          decoration: BoxDecoration(
-            color: const Color(
-              0xFF101022,
-            ).withValues(alpha: 0.6), // background-dark/50
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.05),
-              width: 0,
+    return BlocBuilder<ChatMessageCubit, ChatMessageState>(
+      builder: (context, state) {
+        return ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+              decoration: BoxDecoration(
+                color: const Color(0xFF101022).withValues(alpha: 0.6),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.05),
+                  width: 0,
+                ),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: Colors.transparent,
+                    child: IconButton(
+                      icon: const Icon(Icons.add, color: Color(0xFF9292C9)),
+                      onPressed: () {},
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: Colors.transparent),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      alignment: Alignment.centerLeft,
+                      child: TextField(
+                        controller: _controller,
+                        enabled: !state.isTyping && !state.isLoading,
+                        onSubmitted: (_) => _send(context),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: "Message Sophia...",
+                          hintStyle: TextStyle(color: Color(0xFF9292C9)),
+                          isDense: true,
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  GestureDetector(
+                    onTap: state.isTyping ? null : () => _send(context),
+                    child: Container(
+                      width: 50,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: theme.primaryColor,
+                        boxShadow: [
+                          BoxShadow(
+                            color: theme.primaryColor.withValues(alpha: 0.6),
+                            blurRadius: 20,
+                            spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: state.isTyping
+                          ? const Padding(
+                              padding: EdgeInsets.all(14),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.send, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          child: Row(
-            children: [
-              // Botón +
-              CircleAvatar(
-                backgroundColor: Colors.transparent,
-                child: IconButton(
-                  icon: const Icon(Icons.add, color: Color(0xFF9292C9)),
-                  onPressed: () {},
-                ),
-              ),
-              const SizedBox(width: 8),
-
-              // Input Field
-              Expanded(
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05), // bg-white/5
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: Colors.transparent),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  alignment: Alignment.centerLeft,
-                  child: const TextField(
-                    decoration: InputDecoration(
-                      border: InputBorder.none,
-                      hintText: "Message Sophia...",
-                      hintStyle: TextStyle(color: Color(0xFF9292C9)),
-                      isDense: true,
-                    ),
-                    style: TextStyle(color: Colors.white),
-                  ),
-                ),
-              ),
-
-              const SizedBox(width: 12),
-
-              // Botón Micrófono con Glow (Shadow)
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: theme.primaryColor,
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.primaryColor.withValues(alpha: 0.6),
-                      blurRadius: 20, // shadow-lg shadow-primary/40
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: const Icon(Icons.mic, color: Colors.white),
-              ),
-            ],
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

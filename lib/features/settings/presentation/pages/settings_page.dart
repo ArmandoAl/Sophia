@@ -1,207 +1,104 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:sophia_ai/core/widgets/sophia_card.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sophia_ai/core/widgets/neon_wrapper.dart';
-import '../cubit/settings_cubit.dart';
-import '../cubit/settings_state.dart';
+import 'package:sophia_ai/core/widgets/sophia_card.dart';
+import 'package:sophia_ai/features/session/presentation/cubit/session_cubit.dart';
+import 'package:sophia_ai/features/session/presentation/cubit/session_state.dart';
 
+/// Settings hub for F1 account surfaces (profile, assistant, logout).
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
     return NeonWrapper(
-      child: BlocProvider(
-        create: (_) => SettingsCubit(),
-        child: Scaffold(
-          backgroundColor: Colors.transparent,
-          body: SafeArea(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(24),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  "Settings",
+                  'Settings',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  "Customize your Sophia AI experience",
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.grey,
-                      ),
+                BlocBuilder<SessionCubit, SessionState>(
+                  builder: (context, state) {
+                    final email = state is SessionAuthenticated
+                        ? state.user.email
+                        : '';
+                    return Text(
+                      email.isEmpty
+                          ? 'Account & assistant'
+                          : 'Signed in as $email',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
                 Expanded(
-                  child: SingleChildScrollView(
-                    child: BlocBuilder<SettingsCubit, SettingsState>(
-                      builder: (context, state) {
-                        return Column(
+                  child: ListView(
+                    children: [
+                      SophiaCard(
+                        child: Column(
                           children: [
-                            // General Settings Section
-                            _buildSectionTitle(context, "General"),
-                            const SizedBox(height: 16),
-                            SophiaCard(
-                              child: Column(
-                                children: [
-                                  _buildSwitchTile(
-                                    context,
-                                    icon: Icons.notifications_outlined,
-                                    title: "Notifications",
-                                    subtitle: "Receive alerts and updates",
-                                    value: state.notificationsEnabled,
-                                    onChanged: (value) =>
-                                        context.read<SettingsCubit>().toggleNotifications(value),
-                                  ),
-                                  const Divider(color: Colors.white10, height: 1),
-                                  _buildSwitchTile(
-                                    context,
-                                    icon: Icons.dark_mode_outlined,
-                                    title: "Dark Mode",
-                                    subtitle: "Always enabled for optimal experience",
-                                    value: state.darkModeEnabled,
-                                    onChanged: null, // Disabled - siempre dark mode
-                                  ),
-                                ],
-                              ),
+                            ListTile(
+                              key: const Key('settings_profile'),
+                              leading: const Icon(Icons.person_outline),
+                              title: const Text('Profile'),
+                              subtitle: const Text('Name, timezone, locale'),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => context.go('/profile'),
                             ),
-                            const SizedBox(height: 32),
-
-                            // Voice Assistant Section
-                            _buildSectionTitle(context, "Voice Assistant"),
-                            const SizedBox(height: 16),
-                            SophiaCard(
-                              child: Column(
-                                children: [
-                                  _buildSwitchTile(
-                                    context,
-                                    icon: Icons.mic_outlined,
-                                    title: "Voice Assistant",
-                                    subtitle: "Enable Sophia voice commands",
-                                    value: state.voiceAssistantEnabled,
-                                    onChanged: (value) =>
-                                        context.read<SettingsCubit>().toggleVoiceAssistant(value),
-                                  ),
-                                  const Divider(color: Colors.white10, height: 1),
-                                  Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.volume_up_outlined,
-                                              color: Theme.of(context).primaryColor,
-                                              size: 20,
-                                            ),
-                                            const SizedBox(width: 12),
-                                            Text(
-                                              "Voice Volume",
-                                              style: Theme.of(context).textTheme.bodyLarge,
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Slider(
-                                          value: state.voiceVolume,
-                                          onChanged: (value) =>
-                                              context.read<SettingsCubit>().changeVoiceVolume(value),
-                                          activeColor: Theme.of(context).primaryColor,
-                                          inactiveColor: Colors.grey.shade800,
-                                        ),
-                                        Text(
-                                          "${(state.voiceVolume * 100).toInt()}%",
-                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                color: Colors.grey,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                            const Divider(color: Colors.white10, height: 1),
+                            ListTile(
+                              key: const Key('settings_assistant'),
+                              leading: const Icon(Icons.smart_toy_outlined),
+                              title: const Text('Assistant settings'),
+                              subtitle: const Text(
+                                'Sofía preferences (proposal-only)',
                               ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => context.go('/assistant-settings'),
                             ),
-                            const SizedBox(height: 32),
-
-                            // Language & Region
-                            _buildSectionTitle(context, "Language & Region"),
-                            const SizedBox(height: 16),
-                            SophiaCard(
-                              child: _buildTile(
-                                context,
-                                icon: Icons.language_outlined,
-                                title: "Language",
-                                subtitle: state.language,
-                                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                                onTap: () => _showLanguageDialog(context),
-                              ),
+                            const Divider(color: Colors.white10, height: 1),
+                            ListTile(
+                              key: const Key('settings_diagnostics'),
+                              leading: const Icon(Icons.monitor_heart_outlined),
+                              title: const Text('Diagnostics'),
+                              subtitle: const Text('Backend health'),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: () => context.go('/dashboard'),
                             ),
-                            const SizedBox(height: 32),
-
-                            // About Section
-                            _buildSectionTitle(context, "About"),
-                            const SizedBox(height: 16),
-                            SophiaCard(
-                              child: Column(
-                                children: [
-                                  _buildTile(
-                                    context,
-                                    icon: Icons.info_outline,
-                                    title: "Version",
-                                    subtitle: "1.0.0",
-                                  ),
-                                  const Divider(color: Colors.white10, height: 1),
-                                  _buildTile(
-                                    context,
-                                    icon: Icons.privacy_tip_outlined,
-                                    title: "Privacy Policy",
-                                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                                    onTap: () {},
-                                  ),
-                                  const Divider(color: Colors.white10, height: 1),
-                                  _buildTile(
-                                    context,
-                                    icon: Icons.description_outlined,
-                                    title: "Terms of Service",
-                                    trailing: const Icon(Icons.chevron_right, color: Colors.grey),
-                                    onTap: () {},
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 32),
-
-                            // Logout Button
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: () {
-                                  // Implementar logout
-                                },
-                                icon: const Icon(Icons.logout, color: Colors.red),
-                                label: const Text(
-                                  "Sign Out",
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                                style: OutlinedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  side: const BorderSide(color: Colors.red),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
                           ],
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SophiaCard(
+                        child: ListTile(
+                          key: const Key('settings_logout'),
+                          leading: Icon(
+                            Icons.logout,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          title: Text(
+                            'Sign out',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                          onTap: () => context.read<SessionCubit>().logout(),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -209,120 +106,6 @@ class SettingsPage extends StatelessWidget {
           ),
         ),
       ),
-    ),
-    );
-  }
-
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    return Text(
-      title.toUpperCase(),
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: Theme.of(context).primaryColor,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.2,
-          ),
-    );
-  }
-
-  Widget _buildSwitchTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    String? subtitle,
-    required bool value,
-    required ValueChanged<bool>? onChanged,
-  }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: Theme.of(context).primaryColor, size: 20),
-      ),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.bodyLarge,
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
-                  ),
-            )
-          : null,
-      trailing: Switch(
-        value: value,
-        onChanged: onChanged,
-        activeColor: Theme.of(context).primaryColor,
-      ),
-    );
-  }
-
-  Widget _buildTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    String? subtitle,
-    Widget? trailing,
-    VoidCallback? onTap,
-  }) {
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Icon(icon, color: Theme.of(context).primaryColor, size: 20),
-      ),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.bodyLarge,
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.grey,
-                  ),
-            )
-          : null,
-      trailing: trailing,
-      onTap: onTap,
-    );
-  }
-
-  void _showLanguageDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF151B24),
-        title: const Text("Select Language"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildLanguageOption(context, dialogContext, "English"),
-            _buildLanguageOption(context, dialogContext, "Español"),
-            _buildLanguageOption(context, dialogContext, "Français"),
-            _buildLanguageOption(context, dialogContext, "Deutsch"),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLanguageOption(BuildContext context, BuildContext dialogContext, String language) {
-    return ListTile(
-      title: Text(language),
-      onTap: () {
-        context.read<SettingsCubit>().changeLanguage(language);
-        Navigator.of(dialogContext).pop();
-      },
     );
   }
 }

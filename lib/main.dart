@@ -1,25 +1,36 @@
-import 'package:flutter/material.dart';
-import 'core/di/service_locator.dart';
-import 'core/theme/app_theme.dart';
-import 'core/router/app_router.dart'; // Importar el router
+import 'dart:async';
 
-void main() async {
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sophia_ai/core/di/service_locator.dart';
+import 'package:sophia_ai/core/router/app_router.dart';
+import 'package:sophia_ai/core/theme/app_theme.dart';
+import 'package:sophia_ai/features/session/presentation/cubit/session_cubit.dart';
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initDependencies();
-  runApp(const SophiaApp());
+  final sessionCubit = sl<SessionCubit>();
+  unawaited(sessionCubit.bootstrap());
+  runApp(SophiaApp(sessionCubit: sessionCubit));
 }
 
 class SophiaApp extends StatelessWidget {
-  const SophiaApp({super.key});
+  const SophiaApp({super.key, required this.sessionCubit, this.router});
+
+  final SessionCubit sessionCubit;
+  final RouterConfig<Object>? router;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp.router(
-      // Cambiar a .router
-      title: 'SOPHIA AI',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      routerConfig: AppRouter.router, // Conectar GoRouter
+    return BlocProvider.value(
+      value: sessionCubit,
+      child: MaterialApp.router(
+        title: 'SOPHIA AI',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.darkTheme,
+        routerConfig: router ?? AppRouter.create(sessionCubit: sessionCubit),
+      ),
     );
   }
 }

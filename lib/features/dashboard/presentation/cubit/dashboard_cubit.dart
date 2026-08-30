@@ -2,13 +2,13 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'dashboard_state.dart';
 import '../../domain/system_health.dart';
 
+/// Legacy dashboard mock (CPU/RAM). Prefer [HealthCubit] for backend health.
 class DashboardCubit extends Cubit<DashboardState> {
-  // Aquí inyectarías el UseCase en el constructor
   DashboardCubit() : super(DashboardInitial());
 
   void loadDashboardData() async {
     emit(DashboardLoading());
-    // Simulación de delay y datos (reemplazar con UseCase real)
+    // Prototype only — not GET /health. See HealthCubit for real backend status.
     await Future.delayed(const Duration(seconds: 1));
 
     emit(

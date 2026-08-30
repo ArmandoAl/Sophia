@@ -1,0 +1,13 @@
+{
+  "user_id": "usr_me_001",
+  "assistant_name": "Sofía",
+  "communication_style": "warm",
+  "proactivity_level": "medium",
+  "autonomy_level": "suggestive",
+  "memory_enabled": true,
+  "reminders_enabled": true,
+  "planning_enabled": true,
+  "preferred_language": "es",
+  "created_at": "2026-07-10T18:00:00Z",
+  "updated_at": "2026-07-10T18:00:00Z"
+}

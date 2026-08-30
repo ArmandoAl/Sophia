@@ -1,3 +1,9 @@
+/// Prototype UI metrics for the glassmorphism dashboard mock.
+///
+/// **Not** the Sofia Backend health contract. Real backend status uses
+/// [HealthResponse] via [HealthCubit] (`GET /health`).
+///
+/// Kept only so existing dashboard UI compiles until F1 UI wiring replaces it.
 class SystemHealth {
   final double cpuUsage;
   final double ramUsage;

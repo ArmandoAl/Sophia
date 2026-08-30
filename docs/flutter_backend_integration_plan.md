@@ -187,3 +187,15 @@ Secuencia recomendada de releases Flutter:
 - `docs/backend_contract/flutter_screens_mapping.md`
 - `docs/flutter_backend_integration_audit.md`
 - `docs/flutter_missing_models_repositories_cubits.md`
+# Update 2026-07-15
+
+Sprint V1.2 conecta `/chat` al backend real:
+
+- `GET/POST /conversations`;
+- `GET/POST /conversations/{id}/messages`;
+- historial persistido;
+- sin mocks activos en el path productivo.
+
+Siguiente paso minimo: conectar UI de reminders real o selector de conversaciones, segun prioridad de V1.
+# Update 2026-07-16: Reminders are now wired to the real backend collection/detail/action endpoints. FCM and worker remain disabled.
+# Update 2026-07-16: V1.4 preflight passed Flutter analyze, 97 tests and web build. Memory E2E passed; Firestore/Gemini remain external release gates.
