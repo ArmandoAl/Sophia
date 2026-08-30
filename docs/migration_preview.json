@@ -1,0 +1,147 @@
+{
+  "generated_at": "2026-07-01T09:56:58Z",
+  "dry_run": true,
+  "apply": false,
+  "limit": 20,
+  "target_mode": "staging",
+  "targets": [
+    {
+      "collection": "migration_activities_preview",
+      "id": "activity_001",
+      "action": "create",
+      "data": {
+        "ai_manageable": true,
+        "ai_notes": "",
+        "created_at": "2026-07-01T02:56:58.029339-07:00",
+        "created_by": "user",
+        "description": "Reunión con reclutador",
+        "due_at": "2026-05-03T07:00:00Z",
+        "has_reminder": false,
+        "id": "activity_001",
+        "priority": "high",
+        "recurrence_rule": "",
+        "source": "imported",
+        "start_at": "2026-05-03T07:00:00Z",
+        "status": "active",
+        "tags": [],
+        "timezone": "America/Tijuana",
+        "title": "Junta LinkedIn",
+        "type": "task",
+        "updated_at": "2026-07-01T02:56:58.029339-07:00",
+        "user_id": "user_001"
+      },
+      "warnings": [
+        "legacy activity id will be reused",
+        "target-mode=staging writes normalized preview outside production activities",
+        "timezone defaulted to America/Tijuana",
+        "created_at is migration time because legacy activity has no created_at",
+        "user_id extracted from legacy DocumentRef",
+        "activity start_at is in the past",
+        "activity due_at is in the past"
+      ]
+    },
+    {
+      "collection": "ai_settings",
+      "id": "user_001",
+      "action": "create",
+      "data": {
+        "assistant_name": "Sofía",
+        "autonomy_level": "semi_autonomous",
+        "communication_style": "adaptive",
+        "created_at": "2026-05-03T07:00:00Z",
+        "memory_enabled": true,
+        "planning_enabled": true,
+        "preferred_language": "es",
+        "proactivity_level": "medium",
+        "reminders_enabled": true,
+        "updated_at": "2026-07-01T02:56:58.029339-07:00",
+        "user_id": "user_001"
+      },
+      "warnings": [
+        "ai settings are inferred from legacy user preferences",
+        "memory/reminders/planning default to enabled",
+        "preferred_language defaulted to es"
+      ]
+    },
+    {
+      "collection": "migration_reminders_preview",
+      "id": "reminder_001",
+      "action": "create",
+      "data": {
+        "activity_id": "",
+        "created_at": "2026-07-01T02:56:58.029339-07:00",
+        "created_by": "user",
+        "description": "",
+        "id": "reminder_001",
+        "max_retries": 3,
+        "next_run_at": "2026-05-03T07:00:00Z",
+        "recurrence_rule": "",
+        "retry_count": 0,
+        "scheduled_at": "2026-05-03T07:00:00Z",
+        "source": "ai",
+        "status": "pending",
+        "timezone": "America/Tijuana",
+        "title": "Preparar puntos para junta",
+        "updated_at": "2026-07-01T02:56:58.029339-07:00",
+        "user_id": "user_001"
+      },
+      "warnings": [
+        "legacy reminder id will be reused",
+        "target-mode=staging writes normalized preview outside production reminders",
+        "timezone defaulted to America/Tijuana",
+        "created_at is migration time because legacy reminder has no created_at",
+        "user_id extracted from legacy DocumentRef",
+        "scheduled_at is in the past"
+      ]
+    },
+    {
+      "collection": "user_profiles",
+      "id": "user_001",
+      "action": "create",
+      "data": {
+        "avatar_url": "",
+        "created_at": "2026-05-03T07:00:00Z",
+        "display_name": "Armando Alvarado",
+        "id": "user_001",
+        "locale": "es-MX",
+        "onboarding_completed": false,
+        "preferred_name": "Armando Alvarado",
+        "timezone": "America/Mexico_City",
+        "updated_at": "2026-07-01T02:56:58.029339-07:00",
+        "user_id": "user_001"
+      },
+      "warnings": [
+        "legacy user id will be reused as modular user_id"
+      ]
+    },
+    {
+      "collection": "users",
+      "id": "user_001",
+      "action": "manual_review",
+      "data": {
+        "created_at": "2026-05-03T07:00:00Z",
+        "email": "alvaradoarmando301@gmail.com",
+        "id": "user_001",
+        "name": "Armando Alvarado",
+        "role": "user",
+        "updated_at": "2026-07-01T02:56:58.029339-07:00"
+      },
+      "warnings": [
+        "legacy user id will be reused as modular user_id",
+        "password_hash is not present in legacy user; do not overwrite auth users automatically"
+      ]
+    }
+  ],
+  "conflicts": [
+    {
+      "collection": "users",
+      "id": "user_001",
+      "severity": "critical",
+      "message": "manual review target exists and must not be auto-applied"
+    }
+  ],
+  "warnings": [
+    "target-mode=staging; activities/reminders are written to migration preview collections",
+    "preview regenerated offline from last validate-only snapshot because local environment is not configured for Firestore"
+  ]
+}

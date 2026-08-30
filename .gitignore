@@ -1,0 +1,10 @@
+.cache/
+.DS_Store
+*.json.key
+*-key.json
+*serviceaccount*.json
+*service-account*.json
+.env
+.env.*
+/bin/
+/dist/

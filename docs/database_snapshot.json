@@ -1,0 +1,1358 @@
+{
+  "generated_at": "2026-07-01T06:42:32Z",
+  "project_id": "sophia-ai-60e87",
+  "collections": [
+    {
+      "name": "activities",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "ai_action_ref",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "confirmed",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "description",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "end_time",
+          "types": [
+            "timestamp"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "flexibility",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "origin_message_ref",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "priority",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "requires_confirmation",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "reschedulable",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "start_time",
+          "types": [
+            "timestamp"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "title",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "type",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "user_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "activity_001",
+          "ai_action_ref": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/ai_actions_log",
+              "ID": "ai_actions_log"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/ai_actions_log/action_001",
+            "ID": "action_001"
+          },
+          "confirmed": true,
+          "description": "Reunión con reclutador",
+          "end_time": "2026-05-03T07:00:00Z",
+          "flexibility": 60,
+          "origin_message_ref": {
+            "Parent": {
+              "Parent": {
+                "Parent": {
+                  "Parent": null,
+                  "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations",
+                  "ID": "conversations"
+                },
+                "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations/2026-05-03",
+                "ID": "2026-05-03"
+              },
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations/2026-05-03/messages",
+              "ID": "messages"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations/2026-05-03/messages/msg_002",
+            "ID": "msg_002"
+          },
+          "priority": 7,
+          "requires_confirmation": false,
+          "reschedulable": true,
+          "start_time": "2026-05-03T07:00:00Z",
+          "title": "Junta LinkedIn",
+          "type": "ai_proposed",
+          "user_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/users",
+              "ID": "users"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/users/user_001",
+            "ID": "user_001"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ai_actions_log",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "action_type",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "approved",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "body_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "confidence",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "created_at",
+          "types": [
+            "timestamp"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "executed",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "reasoning",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "requires_confirmation",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "target_refs",
+          "types": [
+            "array"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "user_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "action_001",
+          "action_type": "schedule_meeting",
+          "approved": true,
+          "body_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/bodies",
+              "ID": "bodies"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/bodies/body_home_001",
+            "ID": "body_home_001"
+          },
+          "confidence": 0.92,
+          "created_at": "2026-05-03T07:00:00Z",
+          "executed": true,
+          "reasoning": "Usuario solicitó organizar su día",
+          "requires_confirmation": true,
+          "target_refs": [
+            {
+              "Parent": {
+                "Parent": null,
+                "Path": "projects/sophia-ai-60e87/databases/default/documents/activities",
+                "ID": "activities"
+              },
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/activities/activity_001",
+              "ID": "activity_001"
+            }
+          ],
+          "user_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/users",
+              "ID": "users"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/users/user_001",
+            "ID": "user_001"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ai_memory",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "body_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "confidence",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "enabled",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "last_seen",
+          "types": [
+            "timestamp"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "reinforcement_count",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "source_message_ref",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "statement",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "type",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "user_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "memory_001",
+          "body_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/bodies",
+              "ID": "bodies"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/bodies/body_home_001",
+            "ID": "body_home_001"
+          },
+          "confidence": 0.88,
+          "enabled": true,
+          "last_seen": "2026-05-04T07:00:00Z",
+          "reinforcement_count": 3,
+          "source_message_ref": {
+            "Parent": {
+              "Parent": {
+                "Parent": {
+                  "Parent": null,
+                  "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations",
+                  "ID": "conversations"
+                },
+                "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations/2026-05-03",
+                "ID": "2026-05-03"
+              },
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations/2026-05-03/messages",
+              "ID": "messages"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations/2026-05-03/messages/msg_001",
+            "ID": "msg_001"
+          },
+          "statement": "Prefiere reuniones en la mañana",
+          "type": "preference",
+          "user_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/users",
+              "ID": "users"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/users/user_001",
+            "ID": "user_001"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ai_policy",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "action_type",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "confidence_threshold",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "forbidden_without_confirmation",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "requires_confirmation",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "policy_default",
+          "action_type": "financial",
+          "confidence_threshold": 1,
+          "forbidden_without_confirmation": true,
+          "requires_confirmation": true
+        }
+      ]
+    },
+    {
+      "name": "bodies",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "description",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "is_active",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "location",
+          "types": [
+            "*latlng.LatLng"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "user_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "body_home_001",
+          "description": "Central AI instance for house",
+          "is_active": true,
+          "location": {
+            "latitude": 31.8667,
+            "longitude": -116.5967
+          },
+          "name": "Main Home AI",
+          "user_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/users",
+              "ID": "users"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/users/user_001",
+            "ID": "user_001"
+          }
+        }
+      ],
+      "subcollections": [
+        "extensions"
+      ]
+    },
+    {
+      "name": "conversations",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "body_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "session_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "timestamp",
+          "types": [
+            "timestamp"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "user_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "2026-05-03",
+          "body_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/bodies",
+              "ID": "bodies"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/bodies/body_home_001",
+            "ID": "body_home_001"
+          },
+          "session_id": "2026-05-03",
+          "timestamp": "2026-05-03T07:00:00Z",
+          "user_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/users",
+              "ID": "users"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/users/user_001",
+            "ID": "user_001"
+          }
+        }
+      ],
+      "subcollections": [
+        "messages"
+      ]
+    },
+    {
+      "name": "daily_summaries",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "accepted_suggestions",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "date",
+          "types": [
+            "timestamp"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "decisions",
+          "types": [
+            "array"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "focus_index",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "memory_written_refs",
+          "types": [
+            "array"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "stress_index",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "topics",
+          "types": [
+            "array"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "user_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "2026-05-03",
+          "accepted_suggestions": 1,
+          "date": "2026-05-04T07:00:00Z",
+          "decisions": [
+            "schedule meeting"
+          ],
+          "focus_index": 70,
+          "memory_written_refs": [
+            {
+              "Parent": {
+                "Parent": null,
+                "Path": "projects/sophia-ai-60e87/databases/default/documents/ai_memory",
+                "ID": "ai_memory"
+              },
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/ai_memory/memory_001",
+              "ID": "memory_001"
+            }
+          ],
+          "stress_index": 35,
+          "topics": [
+            "planning"
+          ],
+          "user_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/users",
+              "ID": "users"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/users/user_001",
+            "ID": "user_001"
+          }
+        }
+      ]
+    },
+    {
+      "name": "locations",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "coordinates",
+          "types": [
+            "*latlng.LatLng"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "description",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "geo_hash",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "privacy_level",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "type",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "loc_home_001",
+          "coordinates": {
+            "latitude": 31.8667,
+            "longitude": -116.5967
+          },
+          "description": "Casa principal",
+          "geo_hash": "9q5ctr",
+          "name": "Casa Ensenada",
+          "privacy_level": "private",
+          "type": "home"
+        }
+      ]
+    },
+    {
+      "name": "message_embeddings",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "message_ref",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "vector",
+          "types": [
+            "array"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "embed_001",
+          "message_ref": {
+            "Parent": {
+              "Parent": {
+                "Parent": {
+                  "Parent": null,
+                  "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations",
+                  "ID": "conversations"
+                },
+                "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations/2026-05-03",
+                "ID": "2026-05-03"
+              },
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations/2026-05-03/messages",
+              "ID": "messages"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/conversations/2026-05-03/messages/msg_001",
+            "ID": "msg_001"
+          },
+          "vector": [
+            0.12,
+            -0.44,
+            0.98,
+            0.33
+          ]
+        }
+      ]
+    },
+    {
+      "name": "reminders",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "convertible_to_activity",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "source",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "text",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "time",
+          "types": [
+            "timestamp"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "user_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "reminder_001",
+          "convertible_to_activity": true,
+          "source": "ai",
+          "text": "Preparar puntos para junta",
+          "time": "2026-05-03T07:00:00Z",
+          "user_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/users",
+              "ID": "users"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/users/user_001",
+            "ID": "user_001"
+          }
+        }
+      ]
+    },
+    {
+      "name": "users",
+      "sampled_documents": 1,
+      "fields": [
+        {
+          "name": "_document_id",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "ai_auto_action_conf_threshold",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "ai_autonomy_enabled",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "base_personality_prompt",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "communication_style_score",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "context_mode",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "types": [
+            "timestamp"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "default_body_id",
+          "types": [
+            "*firestore.DocumentRef"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "email",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": true,
+          "optional": false
+        },
+        {
+          "name": "humor_tolerance_score",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "name",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "personality_version",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "phone",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "preferred_tone",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "safety_mode_enabled",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "stress_baseline_score",
+          "types": [
+            "number"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "timezone",
+          "types": [
+            "string"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        },
+        {
+          "name": "tone_adaptivity_enabled",
+          "types": [
+            "bool"
+          ],
+          "required_in_sample": true,
+          "sensitive": false,
+          "optional": false
+        }
+      ],
+      "sample_documents_redacted": [
+        {
+          "_document_id": "user_001",
+          "ai_auto_action_conf_threshold": 0.85,
+          "ai_autonomy_enabled": true,
+          "base_personality_prompt": "Sophia es cálida, amable, inteligente, con tono humano, adaptable al contexto.",
+          "communication_style_score": 75,
+          "context_mode": "adaptive",
+          "createdAt": "2026-05-03T07:00:00Z",
+          "default_body_id": {
+            "Parent": {
+              "Parent": null,
+              "Path": "projects/sophia-ai-60e87/databases/default/documents/bodies",
+              "ID": "bodies"
+            },
+            "Path": "projects/sophia-ai-60e87/databases/default/documents/bodies/body_home_001",
+            "ID": "body_home_001"
+          },
+          "email": "alva...[REDACTED]",
+          "humor_tolerance_score": 80,
+          "name": "Armando Alvarado",
+          "personality_version": 1,
+          "phone": "6461285585",
+          "preferred_tone": "adaptive",
+          "safety_mode_enabled": true,
+          "stress_baseline_score": 40,
+          "timezone": "America/Mexico_City",
+          "tone_adaptivity_enabled": true
+        }
+      ]
+    }
+  ],
+  "comparison": {
+    "expected_collections": [
+      "activities",
+      "activity_outcomes",
+      "ai_action_proposals",
+      "ai_settings",
+      "memories",
+      "mood_entries",
+      "reflections",
+      "reminders",
+      "tool_definitions",
+      "user_profiles",
+      "users"
+    ],
+    "actual_collections": [
+      "activities",
+      "ai_actions_log",
+      "ai_memory",
+      "ai_policy",
+      "bodies",
+      "conversations",
+      "daily_summaries",
+      "locations",
+      "message_embeddings",
+      "reminders",
+      "users"
+    ],
+    "missing_collections": [
+      "activity_outcomes",
+      "ai_action_proposals",
+      "ai_settings",
+      "memories",
+      "mood_entries",
+      "reflections",
+      "tool_definitions",
+      "user_profiles"
+    ],
+    "unexpected_collections": [
+      "ai_actions_log",
+      "ai_memory",
+      "ai_policy",
+      "bodies",
+      "conversations",
+      "daily_summaries",
+      "locations",
+      "message_embeddings"
+    ],
+    "field_differences": {
+      "activities": {
+        "missing_fields": [
+          "created_by",
+          "id",
+          "source",
+          "status",
+          "tags",
+          "timezone"
+        ],
+        "unexpected_fields": [
+          "_document_id",
+          "ai_action_ref",
+          "confirmed",
+          "description",
+          "end_time",
+          "flexibility",
+          "origin_message_ref",
+          "requires_confirmation",
+          "reschedulable",
+          "start_time"
+        ]
+      },
+      "reminders": {
+        "missing_fields": [
+          "activity_id",
+          "created_by",
+          "id",
+          "next_run_at",
+          "scheduled_at",
+          "status",
+          "timezone",
+          "title"
+        ],
+        "unexpected_fields": [
+          "_document_id",
+          "convertible_to_activity",
+          "text",
+          "time"
+        ]
+      },
+      "users": {
+        "missing_fields": [
+          "created_at",
+          "id",
+          "password_hash",
+          "role",
+          "updated_at"
+        ],
+        "unexpected_fields": [
+          "_document_id",
+          "ai_auto_action_conf_threshold",
+          "ai_autonomy_enabled",
+          "base_personality_prompt",
+          "communication_style_score",
+          "context_mode",
+          "createdAt",
+          "default_body_id",
+          "humor_tolerance_score",
+          "personality_version",
+          "phone",
+          "preferred_tone",
+          "safety_mode_enabled",
+          "stress_baseline_score",
+          "timezone",
+          "tone_adaptivity_enabled"
+        ]
+      }
+    }
+  }
+}
