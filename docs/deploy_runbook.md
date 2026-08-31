@@ -157,12 +157,15 @@ El servicio permite invocación no autenticada porque Firebase Hosting necesita 
 
 ## 6. Conectar Firebase Hosting y desplegar índices
 
-`firebase.json` apunta a `sofia-backend` en `us-central1`. Antes de desplegar, reemplazar esa región si `${REGION}` es distinta. No se genera `.firebaserc` por adelantado porque todavía no existe un project ID.
+`firebase.json` apunta a `sofia-backend` en `us-central1`. Antes de desplegar, reemplazar esa región si `${REGION}` es distinta.
+
+**Gotcha crítico si el proyecto usa una base Firestore nombrada** (no la `(default)` implícita, ver paso 5): `firebase.json` debe declarar `"firestore": {"database": "<FIRESTORE_DATABASE_ID>", "indexes": "firestore.indexes.json"}`. Sin ese campo `database`, `firebase deploy --only firestore:indexes` crea silenciosamente una base nueva llamada literalmente `(default)` y le despliega los índices ahí — una base vacía, separada de la real, que Cloud Run nunca usa. Ya nos pasó una vez en este proyecto; se detectó con `gcloud firestore databases list` (aparecían dos bases) y se corrigió agregando el campo `database` y volviendo a desplegar. Si eso llega a pasar, borrar la base sobrante vacía con `gcloud firestore databases delete --database="(default)" --project="${PROJECT_ID}"`.
 
 ```sh
 firebase login
 firebase use --add
 # En el selector interactivo: elegir <PROJECT_ID> y asignar el alias deseado.
+# Alternativa no interactiva: escribir .firebaserc con {"projects":{"default":"<PROJECT_ID>"}}.
 
 firebase deploy \
   --only hosting,firestore:indexes \
