@@ -8,7 +8,6 @@ import 'package:sophia_ai/features/chat/presentation/pages/chat_page.dart';
 import 'package:sophia_ai/features/session/presentation/cubit/session_cubit.dart';
 import 'package:sophia_ai/features/session/presentation/pages/splash_session_screen.dart';
 import 'package:sophia_ai/features/settings/presentation/pages/settings_page.dart';
-import 'package:sophia_ai/features/smart_home/presentation/pages/smart_home_page.dart';
 import 'package:sophia_ai/features/system/presentation/pages/diagnostics_screen.dart';
 import 'package:sophia_ai/features/users/presentation/pages/assistant_settings_screen.dart';
 import 'package:sophia_ai/features/users/presentation/pages/onboarding_flow_screen.dart';
@@ -73,15 +72,6 @@ class AppRouter {
                   path: '/chat',
                   name: 'chat',
                   builder: (context, state) => const ChatPage(),
-                ),
-              ],
-            ),
-            StatefulShellBranch(
-              routes: [
-                GoRoute(
-                  path: '/smart-home',
-                  name: 'smart-home',
-                  builder: (context, state) => const SmartHomePage(),
                 ),
               ],
             ),

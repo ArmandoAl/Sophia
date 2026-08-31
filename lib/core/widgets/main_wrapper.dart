@@ -145,23 +145,16 @@ class _SophiaSidebar extends StatelessWidget {
             onTap: () => onTap(0),
           ),
           _SidebarItem(
-            icon: Icons.home_outlined, // Icono similar a screen.png
-            label: "Home",
-            isSelected: currentIndex == 1,
-            onTap: () => onTap(1),
-          ),
-
-          _SidebarItem(
             icon: Icons.dashboard_rounded,
             label: "System",
-            isSelected: currentIndex == 2,
-            onTap: () => onTap(2),
+            isSelected: currentIndex == 1,
+            onTap: () => onTap(1),
           ),
           _SidebarItem(
             icon: Icons.settings,
             label: "Settings",
-            isSelected: currentIndex == 3,
-            onTap: () => onTap(3),
+            isSelected: currentIndex == 2,
+            onTap: () => onTap(2),
           ),
         ],
       ),
@@ -327,25 +320,18 @@ class _GlassBottomBar extends StatelessWidget {
                   ),
 
                   _BottomBarItem(
-                    icon: Icons.home_outlined,
-                    label: 'Home',
-                    isSelected: currentIndex == 1,
-                    onTap: () => onTap(1),
-                    color: theme.primaryColor,
-                  ),
-                  _BottomBarItem(
                     icon: Icons.dashboard_outlined,
                     label: 'System',
-                    isSelected: currentIndex == 2,
-                    onTap: () => onTap(2),
+                    isSelected: currentIndex == 1,
+                    onTap: () => onTap(1),
                     color: theme.primaryColor,
                   ),
 
                   _BottomBarItem(
                     icon: Icons.settings_outlined,
                     label: 'Settings',
-                    isSelected: currentIndex == 3,
-                    onTap: () => onTap(3),
+                    isSelected: currentIndex == 2,
+                    onTap: () => onTap(2),
                     color: theme.primaryColor,
                   ),
                 ],

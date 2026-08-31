@@ -4,7 +4,7 @@
 class FeatureFlags {
   const FeatureFlags({
     this.aiRuntimeEnabled = false,
-    this.aiActionExecutionEnabled = false,
+    this.aiActionExecutionEnabled = true,
     this.notificationsEnabled = false,
     this.privacyDeleteRequestEnabled = false,
     this.smartHomeEnabled = false,
@@ -13,7 +13,8 @@ class FeatureFlags {
   /// F4: AI runtime chat. Keep off until dry-run client wiring is ready.
   final bool aiRuntimeEnabled;
 
-  /// F4: explicit proposal execute. Must stay false by default.
+  /// The backend supports real confirm/reject/execute operations on
+  /// ai_action_proposals, so execution is enabled for the beta.
   final bool aiActionExecutionEnabled;
 
   /// F5: device token / FCM registration UI.

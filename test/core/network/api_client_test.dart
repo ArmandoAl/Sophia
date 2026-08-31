@@ -53,10 +53,10 @@ void main() {
   });
 
   group('FeatureFlags', () {
-    test('defaults are conservative (all false)', () {
+    test('defaults enable beta action execution only', () {
       const flags = FeatureFlags.defaults;
       expect(flags.aiRuntimeEnabled, isFalse);
-      expect(flags.aiActionExecutionEnabled, isFalse);
+      expect(flags.aiActionExecutionEnabled, isTrue);
       expect(flags.notificationsEnabled, isFalse);
       expect(flags.privacyDeleteRequestEnabled, isFalse);
       expect(flags.smartHomeEnabled, isFalse);

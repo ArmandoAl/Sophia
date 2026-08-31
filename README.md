@@ -1,16 +1,9 @@
-# sophia_ai
+# Sofia
 
-A new Flutter project.
+Sofia is a Flutter personal assistant with AI chat, reminders, and profile management.
 
-## Getting Started
+To run the app against a Sofia backend:
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```sh
+fvm flutter run --dart-define=SOFIA_API_BASE_URL=https://<BACKEND_URL>
+```

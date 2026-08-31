@@ -1,6 +1,8 @@
 import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 
+import '../../features/actions/data/action_proposals_repository_impl.dart';
+import '../../features/actions/domain/action_proposals_repository.dart';
 import '../../features/auth/data/auth_repository_impl.dart';
 import '../../features/auth/domain/auth_repository.dart';
 import '../../features/auth/presentation/cubit/auth_cubit.dart';
@@ -78,6 +80,11 @@ Future<void> initDependencies({
   if (!sl.isRegistered<ConversationsRepository>()) {
     sl.registerLazySingleton<ConversationsRepository>(
       () => ConversationsRepositoryImpl(sl<ApiClient>()),
+    );
+  }
+  if (!sl.isRegistered<ActionProposalsRepository>()) {
+    sl.registerLazySingleton<ActionProposalsRepository>(
+      () => ActionProposalsRepositoryImpl(sl<ApiClient>()),
     );
   }
   if (!sl.isRegistered<RemindersRepository>()) {

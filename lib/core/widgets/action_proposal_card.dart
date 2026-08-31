@@ -21,14 +21,14 @@ class ActionProposalCard extends StatelessWidget {
   final String title;
   final List<ProposedAction> actions;
   final VoidCallback? onConfirm;
-  final VoidCallback? onModify;
+  final VoidCallback? onReject;
 
   const ActionProposalCard({
     super.key,
     required this.title,
     required this.actions,
     this.onConfirm,
-    this.onModify,
+    this.onReject,
   });
 
   @override
@@ -81,7 +81,7 @@ class ActionProposalCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: onModify,
+                      onPressed: onReject,
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white70,
                         side: const BorderSide(color: Colors.white24),
@@ -91,7 +91,7 @@ class ActionProposalCard extends StatelessWidget {
                         ),
                       ),
                       child: const Text(
-                        "Modify",
+                        "Reject",
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),

@@ -2,8 +2,10 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sophia_ai/core/config/feature_flags.dart';
 import 'package:sophia_ai/core/di/service_locator.dart';
 import 'package:sophia_ai/core/widgets/neon_wrapper.dart';
+import 'package:sophia_ai/features/actions/domain/action_proposals_repository.dart';
 import 'package:sophia_ai/features/chat/presentation/cubit/chat_message_state.dart';
 import '../cubit/chat_message_cubit.dart';
 import 'package:sophia_ai/features/chat/domain/entities/chat_message.dart';
@@ -147,6 +149,7 @@ class ChatPage extends StatelessWidget {
       case MessageType.actionProposal:
         final proposalTitle = msg.metadata?['title'] as String? ?? 'Proposal';
         final actionsData = msg.metadata?['actions'] as List? ?? [];
+        final executionEnabled = sl<FeatureFlags>().aiActionExecutionEnabled;
 
         final actions = actionsData.map((action) {
           return ProposedAction(
@@ -161,13 +164,53 @@ class ChatPage extends StatelessWidget {
         content = ActionProposalCard(
           title: proposalTitle,
           actions: actions,
-          onConfirm: () {
-            // TODO: Implementar confirmación de propuesta
-            debugPrint("Propuesta confirmada: $proposalTitle");
+          onConfirm: () async {
+            if (!executionEnabled) {
+              debugPrint("Propuesta confirmada: $proposalTitle");
+              return;
+            }
+            try {
+              final repository = sl<ActionProposalsRepository>();
+              for (final action in actionsData) {
+                final proposalId = action['id'] as String;
+                await repository.confirm(proposalId);
+                await repository.execute(proposalId);
+              }
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Proposal confirmed and executed.'),
+                ),
+              );
+            } catch (_) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Could not execute the proposal.'),
+                ),
+              );
+            }
           },
-          onModify: () {
-            // TODO: Implementar modificación de propuesta
-            debugPrint("Modificar propuesta: $proposalTitle");
+          onReject: () async {
+            if (!executionEnabled) {
+              debugPrint("Modificar propuesta: $proposalTitle");
+              return;
+            }
+            try {
+              final repository = sl<ActionProposalsRepository>();
+              for (final action in actionsData) {
+                await repository.reject(action['id'] as String);
+              }
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Proposal rejected.')),
+              );
+            } catch (_) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Could not reject the proposal.')),
+              );
+            }
           },
         );
         break;
