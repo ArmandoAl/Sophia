@@ -232,6 +232,32 @@ func TestLoadGeminiConfig(t *testing.T) {
 	}
 }
 
+func TestLoadDeepSeekRequiresAPIKey(t *testing.T) {
+	t.Setenv("ENV", "development")
+	t.Setenv("AI_MODEL_PROVIDER", "deepseek")
+	t.Setenv("DEEPSEEK_API_KEY", "")
+
+	if _, err := Load(); err == nil {
+		t.Fatal("expected missing DEEPSEEK_API_KEY error")
+	}
+}
+
+func TestLoadDeepSeekConfig(t *testing.T) {
+	t.Setenv("ENV", "development")
+	t.Setenv("AI_MODEL_PROVIDER", "deepseek")
+	t.Setenv("DEEPSEEK_API_KEY", "test-key")
+	t.Setenv("DEEPSEEK_MODEL", "deepseek-test")
+	t.Setenv("DEEPSEEK_BASE_URL", "https://deepseek.test")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.AIModelProvider != "deepseek" || cfg.DeepSeekAPIKey != "test-key" || cfg.DeepSeekModel != "deepseek-test" || cfg.DeepSeekBaseURL != "https://deepseek.test" {
+		t.Fatalf("unexpected DeepSeek config: %+v", cfg)
+	}
+}
+
 func TestLoadRejectsNonProposalOnlyRuntime(t *testing.T) {
 	t.Setenv("ENV", "development")
 	t.Setenv("AI_RUNTIME_PROPOSAL_ONLY", "false")

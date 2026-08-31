@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	runtimeinfra "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/infrastructure"
+	deepseekinfra "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/infrastructure/deepseek"
 	"github.com/armandoalvarado/sofia-backend/internal/config"
 )
 
@@ -39,5 +40,21 @@ func TestBuildModelClientDefaultsToFake(t *testing.T) {
 	}
 	if _, ok := client.(*runtimeinfra.FakeModelClient); !ok {
 		t.Fatalf("expected fake model client, got %T", client)
+	}
+}
+
+func TestBuildModelClientSupportsDeepSeek(t *testing.T) {
+	client, err := BuildModelClient(config.Config{
+		AIModelProvider:  "deepseek",
+		AIRuntimeEnabled: true,
+		DeepSeekAPIKey:   "test-key",
+		DeepSeekModel:    "deepseek-test",
+		DeepSeekBaseURL:  "https://deepseek.test",
+	})
+	if err != nil {
+		t.Fatalf("BuildModelClient returned error: %v", err)
+	}
+	if _, ok := client.(*deepseekinfra.Client); !ok {
+		t.Fatalf("expected DeepSeek client, got %T", client)
 	}
 }

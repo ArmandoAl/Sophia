@@ -9,6 +9,7 @@ import (
 	runtimeapp "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/application"
 	runtimedomain "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/domain"
 	runtimeinfra "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/infrastructure"
+	deepseekinfra "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/infrastructure/deepseek"
 	geminiinfra "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/infrastructure/gemini"
 	authjwt "github.com/armandoalvarado/sofia-backend/internal/auth/infrastructure/jwt"
 	"github.com/armandoalvarado/sofia-backend/internal/config"
@@ -90,6 +91,11 @@ func BuildModelClient(cfg config.Config) (runtimedomain.ModelClient, error) {
 		return runtimeinfra.NewFakeModelClient(), nil
 	case "gemini":
 		return geminiinfra.NewClient(cfg.GeminiAPIKey, cfg.GeminiModel)
+	case "deepseek":
+		if cfg.DeepSeekBaseURL != "" {
+			return deepseekinfra.NewClient(cfg.DeepSeekAPIKey, cfg.DeepSeekModel, deepseekinfra.WithEndpoint(cfg.DeepSeekBaseURL))
+		}
+		return deepseekinfra.NewClient(cfg.DeepSeekAPIKey, cfg.DeepSeekModel)
 	default:
 		return nil, errors.New("unsupported AI model provider")
 	}

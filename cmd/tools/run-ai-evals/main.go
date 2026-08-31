@@ -13,12 +13,13 @@ import (
 	"github.com/armandoalvarado/sofia-backend/internal/ai/evals"
 	runtimedomain "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/domain"
 	runtimeinfra "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/infrastructure"
+	deepseekinfra "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/infrastructure/deepseek"
 	geminiinfra "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/infrastructure/gemini"
 	"github.com/armandoalvarado/sofia-backend/internal/config"
 )
 
 func main() {
-	provider := flag.String("provider", "auto", "model provider: fake, gemini, or auto")
+	provider := flag.String("provider", "auto", "model provider: fake, gemini, deepseek, or auto")
 	outputDir := flag.String("output-dir", "docs", "directory where ai_eval_report.md is written")
 	datasetPath := flag.String("dataset", "docs/evals/ai_runtime_cases.json", "versioned eval dataset path")
 	flag.Parse()
@@ -64,16 +65,29 @@ func run(ctx context.Context, provider, outputDir, datasetPath string) error {
 			if err := writeSkippedGeminiReports(outputDir, cfg.GeminiModel, "GEMINI_API_KEY not set"); err != nil {
 				return err
 			}
-			return nil
+		} else if err := runGeminiEvals(ctx, cfg, outputDir, dataset); err != nil {
+			return err
 		}
+		if cfg.DeepSeekAPIKey == "" {
+			return writeSkippedDeepSeekReports(outputDir, cfg.DeepSeekModel, "DEEPSEEK_API_KEY not set")
+		}
+		return runDeepSeekEvals(ctx, cfg, outputDir, dataset)
 	case "gemini":
 		if cfg.GeminiAPIKey == "" {
 			return writeSkippedGeminiReports(outputDir, cfg.GeminiModel, "GEMINI_API_KEY not set")
 		}
+		return runGeminiEvals(ctx, cfg, outputDir, dataset)
+	case "deepseek":
+		if cfg.DeepSeekAPIKey == "" {
+			return writeSkippedDeepSeekReports(outputDir, cfg.DeepSeekModel, "DEEPSEEK_API_KEY not set")
+		}
+		return runDeepSeekEvals(ctx, cfg, outputDir, dataset)
 	default:
 		return fmt.Errorf("unsupported provider %q", provider)
 	}
+}
 
+func runGeminiEvals(ctx context.Context, cfg config.Config, outputDir string, dataset *evals.Dataset) error {
 	client, err := geminiinfra.NewClient(cfg.GeminiAPIKey, cfg.GeminiModel)
 	if err != nil {
 		return err
@@ -87,6 +101,28 @@ func run(ctx context.Context, provider, outputDir, datasetPath string) error {
 	}
 	if !evals.AllPassed(geminiResults) {
 		return errors.New("gemini AI evals failed")
+	}
+	return nil
+}
+
+func runDeepSeekEvals(ctx context.Context, cfg config.Config, outputDir string, dataset *evals.Dataset) error {
+	options := []deepseekinfra.Option{}
+	if cfg.DeepSeekBaseURL != "" {
+		options = append(options, deepseekinfra.WithEndpoint(cfg.DeepSeekBaseURL))
+	}
+	client, err := deepseekinfra.NewClient(cfg.DeepSeekAPIKey, cfg.DeepSeekModel, options...)
+	if err != nil {
+		return err
+	}
+	results := runProvider(ctx, client, dataset)
+	if err := writeReport(filepath.Join(outputDir, "deepseek_eval_report.md"), "deepseek", cfg.DeepSeekModel, results); err != nil {
+		return err
+	}
+	if err := writeJSONReport(filepath.Join(outputDir, "deepseek_eval_report.json"), evals.NewReport("deepseek", cfg.DeepSeekModel, "completed", "", results)); err != nil {
+		return err
+	}
+	if !evals.AllPassed(results) {
+		return errors.New("deepseek AI evals failed")
 	}
 	return nil
 }
@@ -120,6 +156,29 @@ func writeSkippedGeminiReports(outputDir, model, reason string) error {
 func writeSkippedGeminiReport(path, model, reason string) error {
 	report := "# Gemini Eval Report\n\n"
 	report += "Provider: `gemini`\n\n"
+	if strings.TrimSpace(model) != "" {
+		report += fmt.Sprintf("Model: `%s`\n\n", model)
+	}
+	report += "Status: `skipped`\n\n"
+	report += fmt.Sprintf("Reason: `%s`\n", reason)
+	if err := os.WriteFile(path, []byte(report), 0o644); err != nil {
+		return err
+	}
+	log.Printf("wrote %s", path)
+	return nil
+}
+
+func writeSkippedDeepSeekReports(outputDir, model, reason string) error {
+	if err := writeSkippedDeepSeekReport(filepath.Join(outputDir, "deepseek_eval_report.md"), model, reason); err != nil {
+		return err
+	}
+	report := evals.NewReport("deepseek", model, "skipped", reason, nil)
+	return writeJSONReport(filepath.Join(outputDir, "deepseek_eval_report.json"), report)
+}
+
+func writeSkippedDeepSeekReport(path, model, reason string) error {
+	report := "# DeepSeek Eval Report\n\n"
+	report += "Provider: `deepseek`\n\n"
 	if strings.TrimSpace(model) != "" {
 		report += fmt.Sprintf("Model: `%s`\n\n", model)
 	}

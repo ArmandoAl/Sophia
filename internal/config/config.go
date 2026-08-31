@@ -21,6 +21,7 @@ const (
 	defaultReadHeaderTimeout = 5 * time.Second
 	defaultAIModelProvider   = "fake"
 	defaultGeminiModel       = "gemini-1.5-flash"
+	defaultDeepSeekModel     = "deepseek-v4-pro"
 	defaultJWTAccessTokenTTL = 24 * time.Hour
 	defaultAuthRateLimit     = 10
 	defaultAuthRateWindow    = time.Minute
@@ -51,6 +52,9 @@ type Config struct {
 	AIModelProvider          string
 	GeminiAPIKey             string
 	GeminiModel              string
+	DeepSeekAPIKey           string
+	DeepSeekModel            string
+	DeepSeekBaseURL          string
 	AIRuntimeEnabled         bool
 	AIRuntimeProposalOnly    bool
 	ReminderWorkerEnabled    bool
@@ -86,6 +90,9 @@ func Load() (Config, error) {
 		AIModelProvider:          strings.ToLower(getEnv("AI_MODEL_PROVIDER", defaultAIModelProvider)),
 		GeminiAPIKey:             strings.TrimSpace(os.Getenv("GEMINI_API_KEY")),
 		GeminiModel:              getEnv("GEMINI_MODEL", defaultGeminiModel),
+		DeepSeekAPIKey:           strings.TrimSpace(os.Getenv("DEEPSEEK_API_KEY")),
+		DeepSeekModel:            getEnv("DEEPSEEK_MODEL", defaultDeepSeekModel),
+		DeepSeekBaseURL:          strings.TrimSpace(os.Getenv("DEEPSEEK_BASE_URL")),
 		AIRuntimeEnabled:         boolEnv("AI_RUNTIME_ENABLED", true),
 		AIRuntimeProposalOnly:    boolEnv("AI_RUNTIME_PROPOSAL_ONLY", true),
 		ReminderWorkerEnabled:    boolEnv("REMINDER_WORKER_ENABLED", false),
@@ -122,14 +129,20 @@ func Load() (Config, error) {
 	if cfg.PersistenceDriver == "firestore" && cfg.FirestoreProjectID == "" {
 		return Config{}, errors.New("FIRESTORE_PROJECT_ID is required when PERSISTENCE_DRIVER=firestore")
 	}
-	if cfg.AIModelProvider != "fake" && cfg.AIModelProvider != "gemini" {
-		return Config{}, errors.New("AI_MODEL_PROVIDER must be fake or gemini")
+	if cfg.AIModelProvider != "fake" && cfg.AIModelProvider != "gemini" && cfg.AIModelProvider != "deepseek" {
+		return Config{}, errors.New("AI_MODEL_PROVIDER must be fake, gemini, or deepseek")
 	}
 	if cfg.AIModelProvider == "gemini" && cfg.GeminiAPIKey == "" {
 		return Config{}, errors.New("GEMINI_API_KEY is required when AI_MODEL_PROVIDER=gemini")
 	}
 	if cfg.AIModelProvider == "gemini" && strings.TrimSpace(cfg.GeminiModel) == "" {
 		return Config{}, errors.New("GEMINI_MODEL is required when AI_MODEL_PROVIDER=gemini")
+	}
+	if cfg.AIModelProvider == "deepseek" && cfg.DeepSeekAPIKey == "" {
+		return Config{}, errors.New("DEEPSEEK_API_KEY is required when AI_MODEL_PROVIDER=deepseek")
+	}
+	if cfg.AIModelProvider == "deepseek" && strings.TrimSpace(cfg.DeepSeekModel) == "" {
+		return Config{}, errors.New("DEEPSEEK_MODEL is required when AI_MODEL_PROVIDER=deepseek")
 	}
 	if !cfg.AIRuntimeProposalOnly {
 		return Config{}, errors.New("AI_RUNTIME_PROPOSAL_ONLY=false is not supported yet")
