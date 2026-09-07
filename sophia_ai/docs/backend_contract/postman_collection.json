@@ -1,0 +1,745 @@
+{
+  "info": {
+    "name": "Sofia Backend v0.1 Smoke Tests",
+    "description": "Manual smoke test collection for Sofia Backend v0.1. Uses synthetic data only.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "user_id",
+      "value": ""
+    },
+    {
+      "key": "activity_id",
+      "value": ""
+    },
+    {
+      "key": "reminder_id",
+      "value": ""
+    },
+    {
+      "key": "memory_id",
+      "value": ""
+    },
+    {
+      "key": "action_proposal_id",
+      "value": ""
+    },
+    {
+      "key": "rejected_action_proposal_id",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.collectionVariables.get('smoke_email')) {",
+          "  pm.collectionVariables.set('smoke_email', 'sofia.smoke.' + Date.now() + '@example.test');",
+          "}",
+          "pm.collectionVariables.set('smoke_password', 'SmokePass123!');",
+          "pm.collectionVariables.set('now_rfc3339', new Date().toISOString());",
+          "pm.collectionVariables.set('tomorrow_rfc3339', new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('health returns 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('health status ok', function () { pm.expect(pm.response.json().status).to.eql('ok'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Register",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Sofia Smoke User\",\n  \"email\": \"{{smoke_email}}\",\n  \"password\": \"{{smoke_password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/register",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('register returns 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "if (json.id) { pm.collectionVariables.set('user_id', json.id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Login",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{smoke_email}}\",\n  \"password\": \"{{smoke_password}}\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('login returns 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.expect(json.token).to.be.a('string');",
+              "pm.collectionVariables.set('token', json.token);",
+              "if (json.user && json.user.id) { pm.collectionVariables.set('user_id', json.user.id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users Me",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/users/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "users",
+            "me"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('users/me returns 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.expect(JSON.stringify(json)).to.include(pm.collectionVariables.get('user_id'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update Profile",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"display_name\": \"Sofia Smoke User\",\n  \"preferred_name\": \"Smoke\",\n  \"timezone\": \"America/Tijuana\",\n  \"locale\": \"es-MX\",\n  \"avatar_url\": \"https://example.test/avatar.png\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/users/me/profile",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "users",
+            "me",
+            "profile"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('profile update returns 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Get AI Settings",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/users/me/ai-settings",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "users",
+            "me",
+            "ai-settings"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ai settings returns 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Update AI Settings",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"assistant_name\": \"Sofía\",\n  \"communication_style\": \"concise\",\n  \"proactivity_level\": \"medium\",\n  \"autonomy_level\": \"manual\",\n  \"memory_enabled\": true,\n  \"reminders_enabled\": true,\n  \"planning_enabled\": true,\n  \"preferred_language\": \"es\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/users/me/ai-settings",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "users",
+            "me",
+            "ai-settings"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ai settings update returns 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Activity",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"task\",\n  \"title\": \"Smoke test activity\",\n  \"description\": \"Synthetic manual smoke test activity\",\n  \"priority\": \"medium\",\n  \"due_at\": \"{{tomorrow_rfc3339}}\",\n  \"timezone\": \"America/Tijuana\",\n  \"tags\": [\"smoke\", \"v0.1\"],\n  \"has_reminder\": false,\n  \"ai_manageable\": false\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/activities",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "activities"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('create activity returns 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.expect(json.id).to.be.a('string');",
+              "pm.collectionVariables.set('activity_id', json.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Activities",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/activities?limit=20",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "activities"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('list activities returns 200', function () { pm.response.to.have.status(200); });",
+              "pm.expect(pm.response.json().activities).to.be.an('array');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Reminder",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"activity_id\": \"{{activity_id}}\",\n  \"title\": \"Smoke test reminder\",\n  \"description\": \"Synthetic reminder for API smoke tests\",\n  \"scheduled_at\": \"{{tomorrow_rfc3339}}\",\n  \"timezone\": \"America/Tijuana\",\n  \"recurrence_rule\": \"none\",\n  \"max_retries\": 3\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/reminders",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "reminders"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('create reminder returns 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.expect(json.id).to.be.a('string');",
+              "pm.collectionVariables.set('reminder_id', json.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List Reminders",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/reminders?limit=20",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "reminders"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('list reminders returns 200', function () { pm.response.to.have.status(200); });",
+              "pm.expect(pm.response.json().reminders).to.be.an('array');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Mood",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"activity_id\": \"{{activity_id}}\",\n  \"mood\": \"good\",\n  \"energy_level\": 4,\n  \"stress_level\": 2,\n  \"focus_level\": 4,\n  \"note\": \"Synthetic smoke test mood entry\",\n  \"occurred_at\": \"{{now_rfc3339}}\",\n  \"timezone\": \"America/Tijuana\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/insights/mood",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "insights",
+            "mood"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('create mood returns 201', function () { pm.response.to.have.status(201); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Memory",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"preference\",\n  \"title\": \"Smoke preference\",\n  \"content\": \"Synthetic preference for smoke testing only.\",\n  \"summary\": \"Smoke test memory\",\n  \"source\": \"user_manual\",\n  \"confidence\": \"high\",\n  \"importance\": \"medium\",\n  \"tags\": [\"smoke\", \"qa\"],\n  \"visibility\": \"assistant_context\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/memory",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "memory"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('create memory returns 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.expect(json.id).to.be.a('string');",
+              "pm.collectionVariables.set('memory_id', json.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "AI Runtime Fake Dry Run",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Crea una tarea sintetica para revisar el smoke test mañana\",\n  \"dry_run\": true\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/ai/runtime/message",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "ai",
+            "runtime",
+            "message"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('ai runtime dry run returns 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('dry run did not require action execution', function () { pm.expect(pm.response.text()).to.include('assistant'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Action Proposal",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tool_name\": \"create_activity\",\n  \"proposed_input\": {\n    \"type\": \"task\",\n    \"title\": \"Proposal smoke activity\",\n    \"description\": \"Synthetic proposal created manually from Postman\",\n    \"priority\": \"low\",\n    \"timezone\": \"America/Tijuana\"\n  },\n  \"reason\": \"Manual smoke test proposal\",\n  \"risk_level\": \"low\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/ai/action-proposals",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "ai",
+            "action-proposals"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('create proposal returns 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.expect(json.id).to.be.a('string');",
+              "pm.collectionVariables.set('action_proposal_id', json.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Confirm Action Proposal",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/ai/action-proposals/{{action_proposal_id}}/confirm",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "ai",
+            "action-proposals",
+            "{{action_proposal_id}}",
+            "confirm"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('confirm proposal returns 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Create Action Proposal To Reject",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tool_name\": \"create_memory\",\n  \"proposed_input\": {\n    \"type\": \"system_note\",\n    \"title\": \"Rejected proposal smoke memory\",\n    \"content\": \"Synthetic proposal intended to be rejected.\",\n    \"source\": \"user_manual\",\n    \"confidence\": \"medium\",\n    \"importance\": \"low\",\n    \"visibility\": \"assistant_context\"\n  },\n  \"reason\": \"Manual smoke test reject path\",\n  \"risk_level\": \"low\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/ai/action-proposals",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "ai",
+            "action-proposals"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('create reject proposal returns 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.expect(json.id).to.be.a('string');",
+              "pm.collectionVariables.set('rejected_action_proposal_id', json.id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject Action Proposal",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{base_url}}/ai/action-proposals/{{rejected_action_proposal_id}}/reject",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "ai",
+            "action-proposals",
+            "{{rejected_action_proposal_id}}",
+            "reject"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('reject proposal returns 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Export User Data",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/users/me/export",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "users",
+            "me",
+            "export"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('export returns 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('export belongs to current user', function () { pm.expect(pm.response.text()).to.include(pm.collectionVariables.get('user_id')); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+
