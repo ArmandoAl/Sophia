@@ -80,6 +80,12 @@ func (b *ContextBuilder) Build(ctx context.Context, userID, message string) (dom
 	if err != nil {
 		return domain.ContextSummary{}, err
 	}
+	now := time.Now().UTC()
+	if me.Profile != nil && strings.TrimSpace(me.Profile.Timezone) != "" {
+		if location, err := time.LoadLocation(me.Profile.Timezone); err == nil {
+			now = now.In(location)
+		}
+	}
 
 	summary := domain.ContextSummary{
 		User: domain.UserSummary{
@@ -92,7 +98,8 @@ func (b *ContextBuilder) Build(ctx context.Context, userID, message string) (dom
 			"due_reminders":     b.limit,
 			"relevant_memories": b.limit,
 		},
-		TokenBudget: domain.TokenBudget{MaxApproxTokens: b.tokenLimit},
+		CurrentDateTime: now.Format(time.RFC3339),
+		TokenBudget:     domain.TokenBudget{MaxApproxTokens: b.tokenLimit},
 	}
 	if me.Profile != nil {
 		summary.Profile = domain.ProfileSummary{

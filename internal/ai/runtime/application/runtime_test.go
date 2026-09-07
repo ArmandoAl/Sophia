@@ -68,6 +68,61 @@ func TestContextBuilderCollectsOnlyUserData(t *testing.T) {
 	}
 }
 
+func TestContextBuilderSetsCurrentDateTime(t *testing.T) {
+	t.Run("profile timezone", func(t *testing.T) {
+		env := newRuntimeTestEnv(t)
+		user := env.createUser(t, "user-timezone", "timezone@example.com")
+		timezone := "America/Mexico_City"
+		if _, err := env.users.UpdateProfile(user.ID, usersdomain.ProfileUpdate{Timezone: &timezone}); err != nil {
+			t.Fatal(err)
+		}
+
+		summary, err := env.contextBuilder.Build(context.Background(), user.ID, "mañana")
+		if err != nil {
+			t.Fatal(err)
+		}
+		current, err := time.Parse(time.RFC3339, summary.CurrentDateTime)
+		if err != nil {
+			t.Fatalf("current_datetime is not RFC3339: %q: %v", summary.CurrentDateTime, err)
+		}
+		location, err := time.LoadLocation(timezone)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, gotOffset := current.Zone()
+		_, wantOffset := current.In(location).Zone()
+		if gotOffset != wantOffset {
+			t.Fatalf("current_datetime offset = %d, want %d for %s", gotOffset, wantOffset, timezone)
+		}
+	})
+
+	t.Run("missing profile falls back to UTC", func(t *testing.T) {
+		env := newRuntimeTestEnv(t)
+		user := env.createUser(t, "user-utc", "utc@example.com")
+		builder := runtimeapp.NewContextBuilder(
+			profilelessUserReader{delegate: env.users},
+			env.activities,
+			env.reminders,
+			env.insights,
+			env.memories,
+			5,
+		)
+
+		summary, err := builder.Build(context.Background(), user.ID, "hoy")
+		if err != nil {
+			t.Fatal(err)
+		}
+		current, err := time.Parse(time.RFC3339, summary.CurrentDateTime)
+		if err != nil {
+			t.Fatalf("current_datetime is not RFC3339: %q: %v", summary.CurrentDateTime, err)
+		}
+		_, offset := current.Zone()
+		if offset != 0 {
+			t.Fatalf("current_datetime offset = %d, want UTC", offset)
+		}
+	})
+}
+
 func TestSettingsGateContextAndTools(t *testing.T) {
 	env := newRuntimeTestEnv(t)
 	ctx := context.Background()
@@ -249,6 +304,7 @@ type runtimeTestEnv struct {
 	users          *usersapp.Service
 	activities     *activitiesapp.Service
 	reminders      *remindersapp.Service
+	insights       *insightsapp.Service
 	memories       *memoryapp.Service
 	actions        *actionsapp.Service
 	contextBuilder *runtimeapp.ContextBuilder
@@ -257,6 +313,20 @@ type runtimeTestEnv struct {
 	authRepo       *authinfra.InMemoryUserRepository
 	profiles       *usersinfra.InMemoryUserProfileRepository
 	settings       *usersinfra.InMemoryAISettingsRepository
+}
+
+type profilelessUserReader struct {
+	delegate *usersapp.Service
+}
+
+func (r profilelessUserReader) GetMe(userID string) (*usersapp.Me, error) {
+	me, err := r.delegate.GetMe(userID)
+	if err != nil {
+		return nil, err
+	}
+	withoutProfile := *me
+	withoutProfile.Profile = nil
+	return &withoutProfile, nil
 }
 
 func newRuntimeTestEnv(t *testing.T) *runtimeTestEnv {
@@ -295,6 +365,7 @@ func newRuntimeTestEnv(t *testing.T) *runtimeTestEnv {
 		users:          users,
 		activities:     activities,
 		reminders:      reminders,
+		insights:       insights,
 		memories:       memories,
 		actions:        actions,
 		contextBuilder: contextBuilder,

@@ -155,6 +155,7 @@ func buildPrompt(request runtimedomain.ModelRequest) string {
 			"Never execute actions. Only propose actions.",
 			"Only use tools from available_tools.",
 			"Never include user_id, email, token, secret, password, or owner fields in proposed_input.",
+			"Use context_summary.current_datetime as the authoritative current date and time (with UTC offset) to resolve relative expressions like today, tomorrow, or in one hour. Never ask the user what the current date is.",
 			"If uncertain, return no proposed_actions and a concise assistant_message.",
 		},
 		"output_shape": map[string]any{

@@ -50,6 +50,7 @@ type ContextSummary struct {
 	InsightsSummary   map[string]any    `json:"insights_summary"`
 	RelevantMemories  []ItemSummary     `json:"relevant_memories"`
 	Limits            map[string]int    `json:"limits"`
+	CurrentDateTime   string            `json:"current_datetime"`
 	TokenBudget       TokenBudget       `json:"token_budget"`
 	MemoryIncluded    bool              `json:"memory_included"`
 	RemindersIncluded bool              `json:"reminders_included"`
