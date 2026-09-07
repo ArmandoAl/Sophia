@@ -108,6 +108,7 @@ class ChatMessageCubit extends Cubit<ChatMessageState> {
                       'label': action.toolName,
                       'detail': action.reason,
                       'color': action.riskLevel == 'high' ? 'orange' : 'cyan',
+                      'proposed_input': action.proposedInput,
                     },
                   )
                   .toList(),

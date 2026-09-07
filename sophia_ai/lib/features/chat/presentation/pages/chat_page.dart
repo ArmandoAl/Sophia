@@ -158,60 +158,76 @@ class ChatPage extends StatelessWidget {
             label: action['label'] as String,
             detail: action['detail'] as String,
             color: _getColorFromString(action['color'] as String?),
+            proposedInput: Map<String, dynamic>.from(
+              (action['proposed_input'] as Map?) ?? const {},
+            ),
           );
         }).toList();
 
         content = ActionProposalCard(
           title: proposalTitle,
           actions: actions,
-          onConfirm: () async {
-            if (!executionEnabled) {
-              debugPrint("Propuesta confirmada: $proposalTitle");
-              return;
-            }
-            try {
-              final repository = sl<ActionProposalsRepository>();
-              for (final action in actionsData) {
-                final proposalId = action['id'] as String;
-                await repository.confirm(proposalId);
-                await repository.execute(proposalId);
-              }
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Proposal confirmed and executed.'),
-                ),
-              );
-            } catch (_) {
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Could not execute the proposal.'),
-                ),
-              );
-            }
-          },
-          onReject: () async {
-            if (!executionEnabled) {
-              debugPrint("Modificar propuesta: $proposalTitle");
-              return;
-            }
-            try {
-              final repository = sl<ActionProposalsRepository>();
-              for (final action in actionsData) {
-                await repository.reject(action['id'] as String);
-              }
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Proposal rejected.')),
-              );
-            } catch (_) {
-              if (!context.mounted) return;
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Could not reject the proposal.')),
-              );
-            }
-          },
+          onConfirm:
+              (action, {correctedInput, required decisionLatencyMs}) async {
+                if (!executionEnabled) {
+                  debugPrint("Propuesta confirmada: ${action.label}");
+                  return;
+                }
+                try {
+                  final repository = sl<ActionProposalsRepository>();
+                  await repository.confirm(
+                    action.id,
+                    correctedInput: correctedInput,
+                    decisionLatencyMs: decisionLatencyMs,
+                  );
+                  await repository.execute(action.id);
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Proposal confirmed and executed.'),
+                    ),
+                  );
+                } catch (_) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not execute the proposal.'),
+                    ),
+                  );
+                  rethrow;
+                }
+              },
+          onReject:
+              (
+                action, {
+                required rejectionReason,
+                required decisionLatencyMs,
+              }) async {
+                if (!executionEnabled) {
+                  debugPrint("Propuesta rechazada: ${action.label}");
+                  return;
+                }
+                try {
+                  final repository = sl<ActionProposalsRepository>();
+                  await repository.reject(
+                    action.id,
+                    rejectionReason: rejectionReason,
+                    decisionLatencyMs: decisionLatencyMs,
+                  );
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Proposal rejected.')),
+                  );
+                } catch (_) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Could not reject the proposal.'),
+                    ),
+                  );
+                  rethrow;
+                }
+              },
         );
         break;
       default:
