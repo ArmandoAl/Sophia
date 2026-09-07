@@ -1,0 +1,38 @@
+# --- Secretos: nunca subir ---
+.env
+.env.*
+*.pem
+*.key
+*credential*.json
+*credentials*.json
+*service-account*.json
+*service_account*.json
+*-key.json
+
+# --- macOS ---
+.DS_Store
+
+# --- Herramientas locales ---
+.codebase-memory/
+.claude/
+
+# --- Go (backend) ---
+sophia_ai_backend/sofia-backend/.cache/
+
+# --- Flutter (frontend): ~2,1 GB de artefactos de build ---
+sophia_ai/build/
+sophia_ai/.dart_tool/
+sophia_ai/.flutter-plugins
+sophia_ai/.flutter-plugins-dependencies
+sophia_ai/.fvm/
+sophia_ai/ios/Pods/
+sophia_ai/ios/.symlinks/
+sophia_ai/ios/Flutter/ephemeral/
+sophia_ai/macos/Pods/
+sophia_ai/macos/Flutter/ephemeral/
+sophia_ai/linux/flutter/ephemeral/
+sophia_ai/windows/flutter/ephemeral/
+
+# --- IDE ---
+.idea/
+*.iml

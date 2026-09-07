@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SOPHIA Data Architecture Explorer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.23.0/cytoscape.min.js"></script>
+    <style>
+      :root {
+        --bg: #0d1117;
+        --panel: #161b22;
+        --border: #30363d;
+        --text: #c9d1d9;
+        --accent: #58a6ff;
+        --field: #ff7b72;
+      }
+      body {
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        margin: 0;
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+      #cy {
+        flex-grow: 1;
+        height: 100%;
+        cursor: grab;
+      }
+      #details-panel {
+        width: 420px;
+        background: var(--panel);
+        border-left: 1px solid var(--border);
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        box-shadow: -10px 0 20px rgba(0, 0, 0, 0.5);
+        z-index: 10;
+      }
+      .panel-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border);
+        background: #21262d;
+      }
+      .panel-content {
+        padding: 20px;
+        overflow-y: auto;
+        flex-grow: 1;
+      }
+      h2 {
+        color: var(--accent);
+        margin: 0;
+        font-size: 22px;
+      }
+      .collection-desc {
+        font-style: italic;
+        color: #8b949e;
+        margin-bottom: 20px;
+        display: block;
+        font-size: 13px;
+      }
+      .field-group {
+        margin-bottom: 15px;
+      }
+      .field-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px solid #21262d;
+        font-family: "Cascadia Code", monospace;
+        font-size: 13px;
+      }
+      .field-name {
+        color: var(--field);
+        font-weight: bold;
+      }
+      .field-type {
+        color: #8b949e;
+        font-size: 11px;
+      }
+      .ref-tag {
+        background: #238636;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 10px;
+        font-weight: bold;
+        margin-left: 5px;
+      }
+      .instructions {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        pointer-events: none;
+        border: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="cy"></div>
+    <div class="instructions">
+      🖱️ <b>Arrastra</b> para mover colecciones | 🔍 <b>Scroll</b> para zoom |
+      👆 <b>Click</b> para ver campos
+    </div>
+
+    <div id="details-panel">
+      <div class="panel-header">
+        <h2 id="col-title">SOPHIA Explorer</h2>
+        <span id="col-desc"
+          >Selecciona una colección para analizar su estructura SQL-NoSQL</span
+        >
+      </div>
+      <div class="panel-content" id="col-fields">
+        <p>
+          Este mapa visualiza las 11 colecciones del ecosistema y sus
+          interconexiones de datos.
+        </p>
+      </div>
+    </div>
+
+    <script>
+      const dbSchema = {
+        users: {
+          desc: "Perfil maestro del usuario y políticas de IA.",
+          fields: [
+            { n: "name", t: "string" },
+            { n: "email", t: "string" },
+            { n: "ai_profile", t: "map (consent, mode, retention)" },
+            { n: "preferences", t: "map (timezone)" },
+            { n: "created_at", t: "timestamp" },
+          ],
+        },
+        locations: {
+          desc: "Catálogo de espacios físicos monitorizados.",
+          fields: [
+            { n: "name", t: "string" },
+            { n: "coordinates", t: "geopoint" },
+            { n: "type", t: "string" },
+            { n: "description", t: "string" },
+          ],
+        },
+        bodies: {
+          desc: "Nodos centrales de hardware/IA en el hogar.",
+          fields: [
+            { n: "owner_id", t: "reference (users)", r: true },
+            { n: "name", t: "string" },
+            { n: "is_active", t: "boolean" },
+            { n: "is_online", t: "boolean" },
+            { n: "extensions", t: "array (maps)" },
+            { n: "location", t: "geopoint" },
+            { n: "created_at", t: "timestamp" },
+          ],
+        },
+        activities: {
+          desc: "Gestión de tareas, recurrencia y decisiones de IA.",
+          fields: [
+            { n: "user_id", t: "reference (users)", r: true },
+            { n: "associated_body_id", t: "reference (bodies)", r: true },
+            { n: "title", t: "string" },
+            { n: "priority", t: "number (0-9)" },
+            { n: "recurrence_rule", t: "map" },
+            { n: "recurrence_days_index", t: "array (string)" },
+            { n: "ai_generated", t: "boolean" },
+            { n: "decision_trace_id", t: "string" },
+            { n: "reschedule_history", t: "array (maps)" },
+            { n: "start_time/end_time", t: "timestamp" },
+          ],
+        },
+        ai_memory: {
+          desc: "Memoria episódica y semántica vectorizada.",
+          fields: [
+            { n: "userId", t: "reference (users)", r: true },
+            { n: "body_id", t: "reference (bodies)", r: true },
+            { n: "related_activity_id", t: "reference (activities)", r: true },
+            { n: "summary", t: "string" },
+            { n: "embedding_vector", t: "array (number)" },
+            { n: "emotional_tag", t: "string" },
+            { n: "confidence", t: "number" },
+          ],
+        },
+        knowledge_files: {
+          desc: "Archivos de contexto (PDF/Doc) procesados por IA.",
+          fields: [
+            { n: "user_id", t: "reference (users)", r: true },
+            {
+              n: "associated_activity_id",
+              t: "reference (activities)",
+              r: true,
+            },
+            { n: "storage_path", t: "string" },
+            { n: "ai_summary", t: "string" },
+            { n: "ai_entities", t: "array" },
+            { n: "processed", t: "boolean" },
+          ],
+        },
+        conversations: {
+          desc: "Historial multimodal de diálogos usuario-IA.",
+          fields: [
+            { n: "user_id", t: "reference (users)", r: true },
+            { n: "body_id", t: "reference (bodies)", r: true },
+            { n: "user_input", t: "string" },
+            { n: "ai_response", t: "string" },
+            { n: "memory_refs", t: "array (refs)" },
+            { n: "modality", t: "string" },
+          ],
+        },
+        ai_actions_log: {
+          desc: "Bitácora de razonamiento y ejecución de SOPHIA.",
+          fields: [
+            { n: "user_id", t: "reference (users)", r: true },
+            { n: "body_id", t: "reference (bodies)", r: true },
+            { n: "decision_summary", t: "string" },
+            { n: "tools_called", t: "array" },
+            { n: "latency_ms", t: "number" },
+            { n: "executed", t: "boolean" },
+          ],
+        },
+        tool_calls: {
+          desc: "Detalle técnico de ejecución de funciones externas.",
+          fields: [
+            { n: "user_id", t: "reference (users)", r: true },
+            { n: "trace_id", t: "string (link to actions_log)", r: true },
+            { n: "tool_name", t: "string" },
+            { n: "input/output", t: "map" },
+            { n: "status", t: "string" },
+            { n: "error", t: "string" },
+          ],
+        },
+        job_queue: {
+          desc: "Cola de tareas programadas y reintentos.",
+          fields: [
+            { n: "type", t: "string" },
+            { n: "payload", t: "map" },
+            { n: "run_at", t: "timestamp" },
+            { n: "status", t: "string" },
+            { n: "retry_count", t: "number" },
+            { n: "locked_by", t: "string" },
+          ],
+        },
+        presence_logs: {
+          desc: "Registros de sensores y detección de usuarios.",
+          fields: [
+            { n: "body_id", t: "reference (bodies)", r: true },
+            { n: "extension_id", t: "string" },
+            { n: "user_present", t: "boolean" },
+            { n: "detected_by", t: "string" },
+            { n: "ai_interpreted_state", t: "string" },
+          ],
+        },
+      };
+
+      var cy = cytoscape({
+        container: document.getElementById("cy"),
+        elements: [
+          // NODOS
+          { data: { id: "users", label: "1. users" } },
+          { data: { id: "locations", label: "2. locations" } },
+          { data: { id: "bodies", label: "3. bodies" } },
+          { data: { id: "activities", label: "4. activities" } },
+          { data: { id: "ai_memory", label: "5. ai_memory" } },
+          { data: { id: "knowledge_files", label: "6. knowledge_files" } },
+          { data: { id: "conversations", label: "7. conversations" } },
+          { data: { id: "ai_actions_log", label: "8. ai_actions_log" } },
+          { data: { id: "tool_calls", label: "9. tool_calls" } },
+          { data: { id: "job_queue", label: "10. job_queue" } },
+          { data: { id: "presence_logs", label: "11. presence_logs" } },
+          // RELACIONES (Simulando Foreign Keys)
+          {
+            data: { source: "users", target: "bodies", label: "FK: owner_id" },
+          },
+          {
+            data: {
+              source: "users",
+              target: "activities",
+              label: "FK: user_id",
+            },
+          },
+          {
+            data: {
+              source: "bodies",
+              target: "activities",
+              label: "FK: body_id",
+            },
+          },
+          {
+            data: {
+              source: "activities",
+              target: "ai_memory",
+              label: "FK: activity_id",
+            },
+          },
+          {
+            data: {
+              source: "activities",
+              target: "knowledge_files",
+              label: "FK: activity_id",
+            },
+          },
+          {
+            data: {
+              source: "ai_actions_log",
+              target: "tool_calls",
+              label: "FK: trace_id",
+            },
+          },
+          {
+            data: {
+              source: "bodies",
+              target: "presence_logs",
+              label: "FK: body_id",
+            },
+          },
+        ],
+        style: [
+          {
+            selector: "node",
+            style: {
+              "background-color": "#21262d",
+              label: "data(label)",
+              color: "#58a6ff",
+              "text-valign": "center",
+              width: 120,
+              height: 45,
+              shape: "round-rectangle",
+              "border-width": 1,
+              "border-color": "#30363d",
+              "font-size": "10px",
+            },
+          },
+          {
+            selector: "edge",
+            style: {
+              width: 2,
+              "line-color": "#444c56",
+              "target-arrow-color": "#444c56",
+              "target-arrow-shape": "triangle",
+              "curve-style": "bezier",
+              label: "data(label)",
+              "font-size": "8px",
+              color: "#8b949e",
+              "text-rotation": "autorotate",
+            },
+          },
+          {
+            selector: ":selected",
+            style: {
+              "background-color": "#388bfd",
+              "border-color": "#58a6ff",
+              "line-color": "#58a6ff",
+              "target-arrow-color": "#58a6ff",
+            },
+          },
+        ],
+        layout: { name: "cose", padding: 50, animate: true },
+      });
+
+      cy.on("tap", "node", function (evt) {
+        const node = evt.target;
+        const colId = node.id();
+        const data = dbSchema[colId];
+
+        document.getElementById("col-title").innerText = colId;
+        document.getElementById("col-desc").innerText = data.desc;
+
+        let html = "";
+        data.fields.forEach((f) => {
+          html += `<div class="field-item">
+                    <span class="field-name">${f.n} ${f.r ? '<span class="ref-tag">FK</span>' : ""}</span>
+                    <span class="field-type">${f.t}</span>
+                 </div>`;
+        });
+        document.getElementById("col-fields").innerHTML = html;
+
+        cy.animate({ center: { eles: node }, zoom: 1.2 }, { duration: 400 });
+      });
+    </script>
+  </body>
+</html>
