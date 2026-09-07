@@ -1,0 +1,76 @@
+# Environment
+
+## Core
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `ENV` | `development` | no | Runtime mode: `development`, `test` or `production`. |
+| `PORT` | `8080` | no | HTTP server port. |
+| `JWT_SECRET` | insecure development default | production | JWT signing secret. Must be explicit and secure in production. |
+| `JWT_ACCESS_TOKEN_TTL` | `24h` | no | Access token lifetime as Go duration. |
+| `AUTH_RATE_LIMIT_REQUESTS` | `10` | no | Max auth requests per IP+route within the rate window. |
+| `AUTH_RATE_LIMIT_WINDOW` | `1m` | no | Auth rate limit window as Go duration. |
+| `CORS_ALLOWED_ORIGINS` | empty | no | Comma-separated allowed origins. |
+| `REQUEST_BODY_LIMIT_BYTES` | `1048576` | no | Max JSON request body size. |
+
+## Persistence
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `PERSISTENCE_DRIVER` | `memory` | production | `memory` or `firestore`. Production requires `firestore`. |
+| `FIRESTORE_PROJECT_ID` | empty | when Firestore is enabled | Google Cloud/Firebase project ID. |
+| `FIRESTORE_DATABASE_ID` | empty | no | Optional named Firestore database ID. When empty, the SDK default database behavior is used. Set to `default` if your Firebase/Firestore database is named `default`. |
+| `GOOGLE_APPLICATION_CREDENTIALS` | empty | local Firestore with service account | Path to local Google credentials. Do not commit credential JSON files. |
+| `FIRESTORE_EMULATOR_HOST` | empty | emulator only | Firestore emulator host, for example `localhost:8081`. |
+
+## HTTP Timeouts
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `HTTP_READ_TIMEOUT` | `10s` | Request read timeout. |
+| `HTTP_WRITE_TIMEOUT` | `10s` | Response write timeout. |
+| `HTTP_IDLE_TIMEOUT` | `60s` | Keep-alive idle timeout. |
+| `HTTP_READ_HEADER_TIMEOUT` | `5s` | Header read timeout. |
+
+## AI Runtime
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `AI_RUNTIME_ENABLED` | `true` | no | Enables the AI runtime wiring. When false, the app uses the fake provider path. |
+| `AI_RUNTIME_PROPOSAL_ONLY` | `true` | yes | Must remain true. `false` is rejected because autonomous execution is not supported yet. |
+| `AI_MODEL_PROVIDER` | `fake` | no | `fake` or `gemini`. |
+| `GEMINI_API_KEY` | empty | when `AI_MODEL_PROVIDER=gemini` | Gemini API key. Never commit or log this value. |
+| `GEMINI_MODEL` | `gemini-1.5-flash` | when `AI_MODEL_PROVIDER=gemini` | Gemini model name used by the runtime provider. Documented values: `gemini-2.5-flash`, `gemini-1.5-flash`. |
+
+## Reminder Worker
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `REMINDER_WORKER_ENABLED` | `false` | no | Enables the standalone reminder worker command. |
+| `REMINDER_WORKER_ID` | host-derived | no | Stable worker identity used for claim/lease metadata. Set explicitly in multi-instance deployments. |
+| `REMINDER_WORKER_INTERVAL` | `30s` | no | Poll interval for due reminders. Must be a positive Go duration. |
+| `REMINDER_WORKER_BATCH_SIZE` | `50` | no | Max due reminders processed per worker tick. Must be a positive integer. |
+| `REMINDER_WORKER_LEASE_DURATION` | `2m` | no | Processing lease duration for one delivery attempt. Must exceed expected provider latency. |
+| `REMINDER_DELIVERY_PROVIDER` | `noop` | no | Reminder delivery provider: `noop` or `fcm`. |
+
+## FCM
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `FCM_ENABLED` | `false` | no | Enables FCM provider behavior. When false, FCM delivery is a safe no-op. |
+| `FCM_DRY_RUN` | `true` | no | Prevents real network sends when true. |
+| `FCM_PROJECT_ID` | empty | when FCM is enabled | Firebase/Google project ID used for FCM v1. |
+
+Real FCM delivery also uses `GOOGLE_APPLICATION_CREDENTIALS` or Application Default Credentials.
+
+## Firestore Named Databases
+
+For projects using a named database, set:
+
+```sh
+export PERSISTENCE_DRIVER=firestore
+export FIRESTORE_PROJECT_ID=sophia-ai-60e87
+export FIRESTORE_DATABASE_ID=default
+```
+
+When `FIRESTORE_DATABASE_ID` is set, the backend uses `firestore.NewClientWithDatabase`. When it is empty, it preserves the previous `firestore.NewClient` behavior.

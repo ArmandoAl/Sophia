@@ -1,0 +1,23 @@
+{
+  "firestore": {
+    "database": "default",
+    "indexes": "firestore.indexes.json"
+  },
+  "hosting": {
+    "public": "hosting",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "sofia-backend",
+          "region": "us-central1"
+        }
+      }
+    ]
+  }
+}

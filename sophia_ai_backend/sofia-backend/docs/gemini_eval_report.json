@@ -1,0 +1,27 @@
+{
+  "generated_at": "2026-07-04T15:22:15Z",
+  "provider": {
+    "name": "gemini",
+    "model": "gemini-1.5-flash",
+    "latency_ms": 0,
+    "status": "skipped"
+  },
+  "status": "skipped",
+  "reason": "GEMINI_API_KEY not set",
+  "summary": {
+    "passed": 0,
+    "failed": 0,
+    "avg_latency_ms": 0,
+    "proposed_actions_count": 0,
+    "rejected_actions_count": 0,
+    "schema_failures_count": 0,
+    "policy_failures_count": 0
+  },
+  "results": [],
+  "privacy": {
+    "prompts_redacted": true,
+    "full_prompts_stored": false,
+    "sensitive_values_stored": false,
+    "note": "Reports store redacted/truncated eval inputs only; full prompts, context payloads, raw model responses, API keys, tokens and secrets are excluded."
+  }
+}
