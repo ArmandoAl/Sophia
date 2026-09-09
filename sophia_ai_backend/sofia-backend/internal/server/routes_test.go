@@ -1181,6 +1181,127 @@ func TestCreateRejectAndConfirmActionProposal(t *testing.T) {
 	assertProposalStatus(t, rec, actionsdomain.StatusConfirmed)
 }
 
+func TestActionProposalExplanation(t *testing.T) {
+	handler := newTestHandler()
+	token := registerAndLogin(t, handler, "armando@example.com")
+	proposal := createProposalAndDecode(t, handler, token, toolsdomain.ToolCreateActivity, actionsdomain.RiskLow, map[string]any{
+		"title":    "Explain me",
+		"timezone": "America/Tijuana",
+	})
+	rec := performJSON(handler, http.MethodGet, "/ai/action-proposals/"+proposal.ID+"/explanation", nil, token)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+	var resp struct {
+		PredictedApproval      float64 `json:"predicted_approval"`
+		PredictionModelVersion string  `json:"prediction_model_version"`
+		AutonomyModeUsed       string  `json:"autonomy_mode_used"`
+		ToolHistory            struct {
+			Total int `json:"total"`
+		} `json:"tool_history"`
+	}
+	decodeResponse(t, rec, &resp)
+	if resp.PredictedApproval < 0.4 || resp.PredictedApproval > 0.6 {
+		t.Fatalf("cold-start explanation should be near 0.5, got %v", resp.PredictedApproval)
+	}
+	if resp.PredictionModelVersion != actionsdomain.PredictionModelHeuristicV1 {
+		t.Fatalf("unexpected model version %q", resp.PredictionModelVersion)
+	}
+	if resp.AutonomyModeUsed != actionsdomain.AutonomyModeProposed {
+		t.Fatalf("expected proposed mode, got %q", resp.AutonomyModeUsed)
+	}
+	if resp.ToolHistory.Total != 0 {
+		t.Fatalf("expected empty tool history, got %+v", resp.ToolHistory)
+	}
+}
+
+func TestConfirmActionProposalDirectUsesClientLatency(t *testing.T) {
+	handler := newTestHandler()
+	token := registerAndLogin(t, handler, "armando@example.com")
+	proposal := createProposalAndDecode(t, handler, token, toolsdomain.ToolCreateActivity, actionsdomain.RiskLow, map[string]any{
+		"title":    "Direct confirm",
+		"timezone": "America/Tijuana",
+	})
+
+	rec := performJSON(handler, http.MethodPost, "/ai/action-proposals/"+proposal.ID+"/confirm", map[string]any{
+		"decision_latency_ms": 4200,
+	}, token)
+	resp := decodeProposal(t, rec)
+	if resp.Feedback != actionsdomain.FeedbackApprovedDirect || resp.DecisionLatencyMS != 4200 {
+		t.Fatalf("expected direct confirm with client latency, got %+v", resp)
+	}
+}
+
+func TestConfirmActionProposalWithCorrection(t *testing.T) {
+	handler := newTestHandler()
+	token := registerAndLogin(t, handler, "armando@example.com")
+	proposal := createProposalAndDecode(t, handler, token, toolsdomain.ToolCreateActivity, actionsdomain.RiskLow, map[string]any{
+		"title":    "Original title",
+		"timezone": "America/Tijuana",
+	})
+
+	rec := performJSON(handler, http.MethodPost, "/ai/action-proposals/"+proposal.ID+"/confirm", map[string]any{
+		"corrected_input": map[string]any{
+			"title":    "Corrected title",
+			"timezone": "America/Tijuana",
+		},
+	}, token)
+	resp := decodeProposal(t, rec)
+	if resp.Feedback != actionsdomain.FeedbackApprovedCorrected {
+		t.Fatalf("expected corrected feedback, got %+v", resp)
+	}
+	if len(resp.CorrectionDelta) != 1 || resp.CorrectionDelta[0] != "title" {
+		t.Fatalf("expected title correction delta, got %+v", resp.CorrectionDelta)
+	}
+
+	rec = performJSON(handler, http.MethodPost, "/ai/action-proposals/"+proposal.ID+"/execute", nil, token)
+	assertProposalStatus(t, rec, actionsdomain.StatusExecuted)
+	rec = performJSON(handler, http.MethodGet, "/activities", nil, token)
+	var activities listActivitiesTestResponse
+	decodeResponse(t, rec, &activities)
+	if len(activities.Activities) != 1 || activities.Activities[0].Title != "Corrected title" {
+		t.Fatalf("execution did not use corrected input, got %+v", activities.Activities)
+	}
+}
+
+func TestRejectActionProposalWithReason(t *testing.T) {
+	handler := newTestHandler()
+	token := registerAndLogin(t, handler, "armando@example.com")
+	proposal := createProposalAndDecode(t, handler, token, toolsdomain.ToolCreateActivity, actionsdomain.RiskLow, map[string]any{
+		"title":    "Reject me",
+		"timezone": "America/Tijuana",
+	})
+
+	rec := performJSON(handler, http.MethodPost, "/ai/action-proposals/"+proposal.ID+"/reject", map[string]any{
+		"rejection_reason": "wrong_time",
+	}, token)
+	resp := decodeProposal(t, rec)
+	if resp.Status != actionsdomain.StatusRejected || resp.Feedback != actionsdomain.FeedbackRejected || resp.RejectionReason != "wrong_time" {
+		t.Fatalf("expected rejected with reason, got %+v", resp)
+	}
+}
+
+func TestConfirmActionProposalRejectsInvalidCorrectedInput(t *testing.T) {
+	handler := newTestHandler()
+	token := registerAndLogin(t, handler, "armando@example.com")
+	proposal := createProposalAndDecode(t, handler, token, toolsdomain.ToolCreateActivity, actionsdomain.RiskLow, map[string]any{
+		"title":    "Valid original",
+		"timezone": "America/Tijuana",
+	})
+
+	rec := performJSON(handler, http.MethodPost, "/ai/action-proposals/"+proposal.ID+"/confirm", map[string]any{
+		"corrected_input": map[string]any{"title": "Missing timezone"},
+	}, token)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d: %s", http.StatusBadRequest, rec.Code, rec.Body.String())
+	}
+
+	stored := getProposal(t, handler, token, proposal.ID)
+	if stored.Status != actionsdomain.StatusProposed || stored.Feedback != "" {
+		t.Fatalf("invalid correction was persisted: %+v", stored)
+	}
+}
+
 func TestCannotAccessAnotherUsersActionProposal(t *testing.T) {
 	handler := newTestHandler()
 	tokenA := registerAndLogin(t, handler, "armando@example.com")
@@ -1602,11 +1723,14 @@ func newTestRoutesWithAuditAndRateLimit(limit int, window time.Duration) (server
 	actionsService := actionsapp.NewService(actionRepo, toolsService, usersService, activitiesService, remindersService, memoryService)
 	privacyService := privacyapp.NewService(usersService, activitiesService, remindersService, insightsService, memoryService, actionsService, auditRepo, deleteRequestRepo)
 	actionsService.SetAuditRecorder(privacyService)
+	actionsService.SetAutonomyThreshold(0.85)
 	activitiesService.SetReminderBridge(remindersService)
-	contextBuilder := runtimeapp.NewContextBuilder(usersService, activitiesService, remindersService, insightsService, memoryService, 5)
+	contextBuilder := runtimeapp.NewContextBuilder(usersService, activitiesService, remindersService, insightsService, memoryService, 5, 4600)
 	toolSelector := runtimeapp.NewToolSelector(toolsService)
 	planner := runtimeapp.NewPlanner(runtimeinfra.NewFakeModelClient())
-	runtimeService := runtimeapp.NewRuntimeService(contextBuilder, toolSelector, planner, runtimeapp.NewSafetyPolicy(), actionsService)
+	safety := runtimeapp.NewSafetyPolicy()
+	safety.SetAutonomy(actionsService, 0.85)
+	runtimeService := runtimeapp.NewRuntimeService(contextBuilder, toolSelector, planner, safety, actionsService)
 	runtimeService.SetAuditRecorder(privacyService)
 	conversationsService := conversationsapp.NewService(conversationRepo, messageRepo, runtimeService)
 	tokenService := authjwt.New("test-secret")
@@ -1844,6 +1968,11 @@ type proposalTestResponse struct {
 	RiskLevel            string          `json:"risk_level"`
 	RequiresConfirmation bool            `json:"requires_confirmation"`
 	ExecutionError       string          `json:"execution_error"`
+	Feedback             string          `json:"feedback"`
+	CorrectedInput       json.RawMessage `json:"corrected_input"`
+	CorrectionDelta      []string        `json:"correction_delta"`
+	RejectionReason      string          `json:"rejection_reason"`
+	DecisionLatencyMS    int64           `json:"decision_latency_ms"`
 }
 
 type conversationTestResponse struct {
@@ -2069,14 +2198,26 @@ func createProposalAndDecode(t *testing.T, handler http.Handler, token, toolName
 
 func assertProposalStatus(t *testing.T, rec *httptest.ResponseRecorder, status string) {
 	t.Helper()
+	resp := decodeProposal(t, rec)
+	if resp.Status != status {
+		t.Fatalf("expected proposal status %q, got %+v", status, resp)
+	}
+}
+
+func decodeProposal(t *testing.T, rec *httptest.ResponseRecorder) proposalTestResponse {
+	t.Helper()
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d: %s", http.StatusOK, rec.Code, rec.Body.String())
 	}
 	var resp proposalTestResponse
 	decodeResponse(t, rec, &resp)
-	if resp.Status != status {
-		t.Fatalf("expected proposal status %q, got %+v", status, resp)
-	}
+	return resp
+}
+
+func getProposal(t *testing.T, handler http.Handler, token, proposalID string) proposalTestResponse {
+	t.Helper()
+	rec := performJSON(handler, http.MethodGet, "/ai/action-proposals/"+proposalID, nil, token)
+	return decodeProposal(t, rec)
 }
 
 func assertHasAuditAction(t *testing.T, logs []*privacydomain.AuditLog, action string) {

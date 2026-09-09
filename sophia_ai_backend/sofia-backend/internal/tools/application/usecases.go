@@ -22,6 +22,12 @@ func (s *Service) SeedDefaultTools(ctx context.Context) error {
 			return err
 		}
 		if existing != nil {
+			if existing.Reversible != tool.Reversible {
+				existing.Reversible = tool.Reversible
+				if err := s.repo.Save(ctx, existing); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 		if err := s.repo.Save(ctx, tool); err != nil {
@@ -52,17 +58,18 @@ func DefaultTools() []*domain.ToolDefinition {
 		description string
 		category    string
 		confirm     bool
+		reversible  bool
 		minAutonomy string
 		schema      string
 	}{
-		{domain.ToolCreateActivity, "Create an activity for the authenticated user.", domain.CategoryActivities, true, domain.AutonomyManual, `{"type":"object","required":["title","timezone"],"additionalProperties":false,"properties":{"title":{"type":"string"},"description":{"type":"string"},"type":{"type":"string","enum":["task","habit","routine","goal","event","checklist"]},"priority":{"type":"string","enum":["low","medium","high","urgent"]},"timezone":{"type":"string"}}}`},
-		{domain.ToolUpdateActivity, "Update an existing activity.", domain.CategoryActivities, true, domain.AutonomySuggestive, `{"type":"object","required":["activity_id"],"additionalProperties":false,"properties":{"activity_id":{"type":"string"},"title":{"type":"string"},"status":{"type":"string","enum":["pending","active","completed","canceled","archived"]}}}`},
-		{domain.ToolCompleteActivity, "Complete an activity.", domain.CategoryActivities, true, domain.AutonomySuggestive, `{"type":"object","required":["activity_id"],"additionalProperties":false,"properties":{"activity_id":{"type":"string"}}}`},
-		{domain.ToolCreateReminder, "Create a reminder for the authenticated user.", domain.CategoryReminders, true, domain.AutonomyManual, `{"type":"object","required":["title","scheduled_at","timezone"],"additionalProperties":false,"properties":{"activity_id":{"type":"string"},"title":{"type":"string"},"description":{"type":"string"},"scheduled_at":{"type":"string"},"timezone":{"type":"string"}}}`},
-		{domain.ToolCancelReminder, "Cancel a reminder.", domain.CategoryReminders, true, domain.AutonomySuggestive, `{"type":"object","required":["reminder_id"],"additionalProperties":false,"properties":{"reminder_id":{"type":"string"}}}`},
-		{domain.ToolCreateMemory, "Create an explicit memory.", domain.CategoryMemory, true, domain.AutonomyManual, `{"type":"object","required":["title","content"],"additionalProperties":false,"properties":{"title":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"},"source":{"type":"string"},"type":{"type":"string","enum":["preference","fact","episodic","semantic","instruction","relationship","project","system_note"]},"confidence":{"type":"string","enum":["low","medium","high"]},"importance":{"type":"string","enum":["low","medium","high","critical"]},"visibility":{"type":"string","enum":["private","assistant_context","archived"]},"tags":{"type":"array","items":{"type":"string"}}}}`},
-		{domain.ToolSearchMemory, "Search explicit memory.", domain.CategoryMemory, false, domain.AutonomySemiAutonomous, `{"type":"object","additionalProperties":false,"properties":{"query":{"type":"string"},"type":{"type":"string"},"tag":{"type":"string"},"importance":{"type":"string","enum":["low","medium","high","critical"]}}}`},
-		{domain.ToolCreateReflection, "Create a reflection entry.", domain.CategoryInsights, true, domain.AutonomyManual, `{"type":"object","required":["content","occurred_at"],"additionalProperties":false,"properties":{"title":{"type":"string"},"content":{"type":"string"},"occurred_at":{"type":"string"},"tags":{"type":"array","items":{"type":"string"}}}}`},
+		{domain.ToolCreateActivity, "Create an activity for the authenticated user.", domain.CategoryActivities, true, true, domain.AutonomyManual, `{"type":"object","required":["title","timezone"],"additionalProperties":false,"properties":{"title":{"type":"string"},"description":{"type":"string"},"type":{"type":"string","enum":["task","habit","routine","goal","event","checklist"]},"priority":{"type":"string","enum":["low","medium","high","urgent"]},"timezone":{"type":"string"}}}`},
+		{domain.ToolUpdateActivity, "Update an existing activity.", domain.CategoryActivities, true, true, domain.AutonomySuggestive, `{"type":"object","required":["activity_id"],"additionalProperties":false,"properties":{"activity_id":{"type":"string"},"title":{"type":"string"},"status":{"type":"string","enum":["pending","active","completed","canceled","archived"]}}}`},
+		{domain.ToolCompleteActivity, "Complete an activity.", domain.CategoryActivities, true, true, domain.AutonomySuggestive, `{"type":"object","required":["activity_id"],"additionalProperties":false,"properties":{"activity_id":{"type":"string"}}}`},
+		{domain.ToolCreateReminder, "Create a reminder for the authenticated user.", domain.CategoryReminders, true, true, domain.AutonomyManual, `{"type":"object","required":["title","scheduled_at","timezone"],"additionalProperties":false,"properties":{"activity_id":{"type":"string"},"title":{"type":"string"},"description":{"type":"string"},"scheduled_at":{"type":"string"},"timezone":{"type":"string"}}}`},
+		{domain.ToolCancelReminder, "Cancel a reminder.", domain.CategoryReminders, true, false, domain.AutonomySuggestive, `{"type":"object","required":["reminder_id"],"additionalProperties":false,"properties":{"reminder_id":{"type":"string"}}}`},
+		{domain.ToolCreateMemory, "Create an explicit memory.", domain.CategoryMemory, true, true, domain.AutonomyManual, `{"type":"object","required":["title","content"],"additionalProperties":false,"properties":{"title":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"},"source":{"type":"string"},"type":{"type":"string","enum":["preference","fact","episodic","semantic","instruction","relationship","project","system_note"]},"confidence":{"type":"string","enum":["low","medium","high"]},"importance":{"type":"string","enum":["low","medium","high","critical"]},"visibility":{"type":"string","enum":["private","assistant_context","archived"]},"tags":{"type":"array","items":{"type":"string"}}}}`},
+		{domain.ToolSearchMemory, "Search explicit memory.", domain.CategoryMemory, false, true, domain.AutonomySemiAutonomous, `{"type":"object","additionalProperties":false,"properties":{"query":{"type":"string"},"type":{"type":"string"},"tag":{"type":"string"},"importance":{"type":"string","enum":["low","medium","high","critical"]}}}`},
+		{domain.ToolCreateReflection, "Create a reflection entry.", domain.CategoryInsights, true, true, domain.AutonomyManual, `{"type":"object","required":["content","occurred_at"],"additionalProperties":false,"properties":{"title":{"type":"string"},"content":{"type":"string"},"occurred_at":{"type":"string"},"tags":{"type":"array","items":{"type":"string"}}}}`},
 	}
 	result := make([]*domain.ToolDefinition, 0, len(defs))
 	for _, def := range defs {
@@ -70,6 +77,7 @@ func DefaultTools() []*domain.ToolDefinition {
 		if err != nil {
 			panic(err)
 		}
+		tool.Reversible = def.reversible
 		result = append(result, tool)
 	}
 	return result

@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/armandoalvarado/sofia-backend/internal/ai/actions/domain"
 )
@@ -54,6 +55,23 @@ func (r *InMemoryAIActionProposalRepository) List(ctx context.Context, filter do
 	return result, nil
 }
 
+func (r *InMemoryAIActionProposalRepository) ListByDateRange(ctx context.Context, userID string, from, to time.Time) ([]*domain.AIActionProposal, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := make([]*domain.AIActionProposal, 0)
+	for _, proposal := range r.proposals {
+		if proposal.UserID != userID {
+			continue
+		}
+		if proposal.CreatedAt.Before(from) || !proposal.CreatedAt.Before(to) {
+			continue
+		}
+		result = append(result, cloneProposal(proposal))
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt.Before(result[j].CreatedAt) })
+	return result, nil
+}
+
 func (r *InMemoryAIActionProposalRepository) Update(ctx context.Context, proposal *domain.AIActionProposal) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -68,5 +86,12 @@ func cloneProposal(proposal *domain.AIActionProposal) *domain.AIActionProposal {
 	cp := *proposal
 	cp.ProposedInput = append([]byte(nil), proposal.ProposedInput...)
 	cp.ExecutionResult = append([]byte(nil), proposal.ExecutionResult...)
+	cp.CorrectedInput = append([]byte(nil), proposal.CorrectedInput...)
+	if proposal.CorrectionDelta != nil {
+		cp.CorrectionDelta = append([]string(nil), proposal.CorrectionDelta...)
+	}
+	if proposal.PredictionBasis != nil {
+		cp.PredictionBasis = append([]string(nil), proposal.PredictionBasis...)
+	}
 	return &cp
 }

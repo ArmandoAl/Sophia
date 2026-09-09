@@ -41,7 +41,7 @@ func TestGenerateParsesStructuredOutput(t *testing.T) {
 		if req.ResponseFormat.Type != "json_object" || req.Temperature != 0.2 {
 			t.Fatalf("expected JSON response format: %+v", req)
 		}
-		if !strings.Contains(req.Messages[0].Content, "Never execute actions") || !strings.Contains(req.Messages[1].Content, "available_tools") {
+		if !strings.Contains(req.Messages[0].Content, "Never execute actions") || !strings.Contains(req.Messages[0].Content, "available_tools") || !strings.Contains(req.Messages[1].Content, "conversation_history") {
 			t.Fatalf("missing proposal-only prompt: %+v", req.Messages)
 		}
 
@@ -78,6 +78,39 @@ func TestGenerateParsesStructuredOutput(t *testing.T) {
 	}
 	if response.PlannedActions[0].ToolName != toolsdomain.ToolCreateReminder {
 		t.Fatalf("unexpected planned action: %+v", response.PlannedActions[0])
+	}
+}
+
+func TestGenerateSynthesisUsesDecisionsPromptAndUsage(t *testing.T) {
+	clientHTTP := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		var req deepSeekRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if !strings.Contains(req.Messages[0].Content, "DECISIONS") || strings.Contains(req.Messages[1].Content, "conversation_history") {
+			t.Fatalf("synthesis prompt mixed in conversation: %+v", req.Messages)
+		}
+		output := `{"reinforced":[],"contradicted":[],"novel":[]}`
+		body, _ := json.Marshal(map[string]any{
+			"choices": []map[string]any{{"message": map[string]string{"content": output}}},
+			"usage":   map[string]any{"prompt_tokens": 18, "completion_tokens": 7, "prompt_cache_hit_tokens": 12},
+		})
+		return jsonResponse(http.StatusOK, body), nil
+	})}
+
+	client, err := NewClient("test-key", "deepseek-test", WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := client.Generate(context.Background(), runtimedomain.ModelRequest{
+		Message: `{"decisions":{"corrections":[]}}`,
+		Task:    runtimedomain.TaskSynthesize,
+	})
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+	if response.Usage.InputTokens != 18 || response.Usage.OutputTokens != 7 || response.Usage.CachedInputTokens != 12 || response.Usage.Model != "deepseek-test" {
+		t.Fatalf("unexpected usage: %+v", response.Usage)
 	}
 }
 

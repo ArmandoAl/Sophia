@@ -33,6 +33,12 @@ func TestGenerateParsesStructuredOutput(t *testing.T) {
 		if req.GenerationConfig.ResponseMimeType != "application/json" {
 			t.Fatalf("expected JSON response mime type: %+v", req.GenerationConfig)
 		}
+		if req.SystemInstruction == nil || !strings.Contains(req.SystemInstruction.Parts[0].Text, "available_tools") {
+			t.Fatalf("missing stable prompt prefix: %+v", req.SystemInstruction)
+		}
+		if len(req.Contents) == 0 || len(req.Contents[0].Parts) == 0 || !strings.Contains(req.Contents[0].Parts[0].Text, "conversation_history") {
+			t.Fatalf("missing conversation_history in prompt: %+v", req.Contents)
+		}
 		output := `{"assistant_message":"Listo, puedo proponerte el recordatorio.","proposed_actions":[{"tool_name":"create_reminder","proposed_input":{"title":"Estudiar","scheduled_at":"2026-07-02T15:00:00Z","timezone":"America/Tijuana"},"reason":"El usuario pidio un recordatorio.","risk_level":"medium","requires_confirmation":true}]}`
 		body, _ := json.Marshal(map[string]any{
 			"candidates": []map[string]any{{
@@ -68,6 +74,47 @@ func TestGenerateParsesStructuredOutput(t *testing.T) {
 	}
 	if response.PlannedActions[0].ToolName != toolsdomain.ToolCreateReminder {
 		t.Fatalf("unexpected planned action: %+v", response.PlannedActions[0])
+	}
+}
+
+func TestGenerateSynthesisUsesDecisionsPromptAndUsage(t *testing.T) {
+	clientHTTP := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		var req geminiRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		if len(req.Contents) == 0 || strings.Contains(req.Contents[0].Parts[0].Text, "conversation_history") {
+			t.Fatalf("synthesis prompt included conversation: %+v", req.Contents)
+		}
+		if _, ok := req.GenerationConfig.ResponseSchema["properties"].(map[string]any)["reinforced"]; !ok {
+			t.Fatalf("expected synthesis schema, got %+v", req.GenerationConfig.ResponseSchema)
+		}
+		output := `{"reinforced":[],"contradicted":[],"novel":[]}`
+		body, _ := json.Marshal(map[string]any{
+			"candidates": []map[string]any{{
+				"content": map[string]any{"parts": []map[string]string{{"text": output}}},
+			}},
+			"usageMetadata": map[string]any{"promptTokenCount": 21, "candidatesTokenCount": 9, "cachedContentTokenCount": 13},
+		})
+		return jsonResponse(http.StatusOK, body), nil
+	})}
+
+	client, err := NewClient("test-key", "gemini-test", WithEndpoint("https://gemini.test"), WithHTTPClient(clientHTTP))
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := client.Generate(context.Background(), runtimedomain.ModelRequest{
+		Message: `{"decisions":{"corrections":[]}}`,
+		Task:    runtimedomain.TaskSynthesize,
+	})
+	if err != nil {
+		t.Fatalf("Generate returned error: %v", err)
+	}
+	if response.AssistantMessage != `{"reinforced":[],"contradicted":[],"novel":[]}` {
+		t.Fatalf("unexpected synthesis output: %s", response.AssistantMessage)
+	}
+	if response.Usage.InputTokens != 21 || response.Usage.OutputTokens != 9 || response.Usage.CachedInputTokens != 13 || response.Usage.Model != "gemini-test" {
+		t.Fatalf("unexpected usage: %+v", response.Usage)
 	}
 }
 

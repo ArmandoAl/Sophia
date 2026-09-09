@@ -45,6 +45,7 @@ type ToolDefinition struct {
 	OutputSchema         json.RawMessage `json:"output_schema,omitempty"`
 	RequiresConfirmation bool            `json:"requires_confirmation"`
 	Enabled              bool            `json:"enabled"`
+	Reversible           bool            `json:"reversible"`
 	MinAutonomyLevel     string          `json:"min_autonomy_level"`
 	CreatedAt            time.Time       `json:"created_at"`
 	UpdatedAt            time.Time       `json:"updated_at"`

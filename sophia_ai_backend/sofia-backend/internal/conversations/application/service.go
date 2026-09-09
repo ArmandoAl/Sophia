@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"strings"
 
 	runtimedomain "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/domain"
 	"github.com/armandoalvarado/sofia-backend/internal/conversations/domain"
@@ -90,10 +91,17 @@ func (s *Service) SendMessage(ctx context.Context, userID, conversationID, conte
 		return nil, err
 	}
 
+	history, err := s.runtimeHistory(ctx, userID, conversation.ID, userMessage.ID)
+	if err != nil {
+		return nil, err
+	}
+
 	runtimeResponse, err := s.runtime.HandleMessage(ctx, runtimedomain.RuntimeRequest{
-		UserID:  userID,
-		Message: userMessage.Content,
-		DryRun:  true,
+		UserID:         userID,
+		Message:        userMessage.Content,
+		DryRun:         false,
+		ConversationID: conversation.ID,
+		History:        history,
 	})
 	if err != nil {
 		return nil, err
@@ -125,4 +133,38 @@ func (s *Service) SendMessage(ctx context.Context, userID, conversationID, conte
 
 func (s *Service) ArchiveConversation(ctx context.Context, userID, conversationID string) (*domain.Conversation, error) {
 	return s.conversations.Archive(ctx, userID, conversationID)
+}
+
+const (
+	runtimeHistoryLimit = 10
+	runtimeHistoryChars = 500
+)
+
+func (s *Service) runtimeHistory(ctx context.Context, userID, conversationID, currentMessageID string) ([]runtimedomain.Turn, error) {
+	stored, err := s.messages.List(ctx, userID, conversationID, 0, "")
+	if err != nil {
+		return nil, err
+	}
+	history := make([]runtimedomain.Turn, 0, runtimeHistoryLimit)
+	for _, message := range stored {
+		if message == nil || message.ID == currentMessageID {
+			continue
+		}
+		history = append(history, runtimedomain.Turn{
+			Role:    message.Role,
+			Content: truncateChars(message.Content, runtimeHistoryChars),
+		})
+	}
+	if len(history) > runtimeHistoryLimit {
+		history = history[len(history)-runtimeHistoryLimit:]
+	}
+	return history, nil
+}
+
+func truncateChars(value string, limit int) string {
+	runes := []rune(strings.TrimSpace(value))
+	if limit <= 0 || len(runes) <= limit {
+		return string(runes)
+	}
+	return string(runes[:limit])
 }

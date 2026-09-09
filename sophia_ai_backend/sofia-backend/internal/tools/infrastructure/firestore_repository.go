@@ -28,6 +28,7 @@ type firestoreTool struct {
 	OutputSchema         string    `firestore:"output_schema"`
 	RequiresConfirmation bool      `firestore:"requires_confirmation"`
 	Enabled              bool      `firestore:"enabled"`
+	Reversible           bool      `firestore:"reversible"`
 	MinAutonomyLevel     string    `firestore:"min_autonomy_level"`
 	CreatedAt            time.Time `firestore:"created_at"`
 	UpdatedAt            time.Time `firestore:"updated_at"`
@@ -85,7 +86,7 @@ func (r *FirestoreToolDefinitionRepository) List(ctx context.Context, enabledOnl
 }
 
 func toolToDocument(tool *domain.ToolDefinition) firestoreTool {
-	return firestoreTool{ID: tool.ID, Name: tool.Name, Description: tool.Description, Category: tool.Category, InputSchema: string(tool.InputSchema), OutputSchema: string(tool.OutputSchema), RequiresConfirmation: tool.RequiresConfirmation, Enabled: tool.Enabled, MinAutonomyLevel: tool.MinAutonomyLevel, CreatedAt: tool.CreatedAt, UpdatedAt: tool.UpdatedAt}
+	return firestoreTool{ID: tool.ID, Name: tool.Name, Description: tool.Description, Category: tool.Category, InputSchema: string(tool.InputSchema), OutputSchema: string(tool.OutputSchema), RequiresConfirmation: tool.RequiresConfirmation, Enabled: tool.Enabled, Reversible: tool.Reversible, MinAutonomyLevel: tool.MinAutonomyLevel, CreatedAt: tool.CreatedAt, UpdatedAt: tool.UpdatedAt}
 }
 
 func documentToTool(doc *firestore.DocumentSnapshot) (*domain.ToolDefinition, error) {
@@ -93,5 +94,5 @@ func documentToTool(doc *firestore.DocumentSnapshot) (*domain.ToolDefinition, er
 	if err := doc.DataTo(&stored); err != nil {
 		return nil, err
 	}
-	return &domain.ToolDefinition{ID: stored.ID, Name: stored.Name, Description: stored.Description, Category: stored.Category, InputSchema: []byte(stored.InputSchema), OutputSchema: []byte(stored.OutputSchema), RequiresConfirmation: stored.RequiresConfirmation, Enabled: stored.Enabled, MinAutonomyLevel: stored.MinAutonomyLevel, CreatedAt: stored.CreatedAt, UpdatedAt: stored.UpdatedAt}, nil
+	return &domain.ToolDefinition{ID: stored.ID, Name: stored.Name, Description: stored.Description, Category: stored.Category, InputSchema: []byte(stored.InputSchema), OutputSchema: []byte(stored.OutputSchema), RequiresConfirmation: stored.RequiresConfirmation, Enabled: stored.Enabled, Reversible: stored.Reversible, MinAutonomyLevel: stored.MinAutonomyLevel, CreatedAt: stored.CreatedAt, UpdatedAt: stored.UpdatedAt}, nil
 }

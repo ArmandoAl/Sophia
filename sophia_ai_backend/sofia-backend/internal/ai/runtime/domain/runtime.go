@@ -17,10 +17,17 @@ var (
 )
 
 type RuntimeRequest struct {
-	UserID    string
-	Message   string
-	DryRun    bool
-	RequestID string
+	UserID         string
+	Message        string
+	DryRun         bool
+	RequestID      string
+	ConversationID string
+	History        []Turn
+}
+
+type Turn struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
 }
 
 type RuntimeResponse struct {
@@ -54,6 +61,7 @@ type ContextSummary struct {
 	TokenBudget       TokenBudget       `json:"token_budget"`
 	MemoryIncluded    bool              `json:"memory_included"`
 	RemindersIncluded bool              `json:"reminders_included"`
+	PromptBase        string            `json:"-"`
 }
 
 type TokenBudget struct {
@@ -118,15 +126,28 @@ type PlannedAction struct {
 }
 
 type ModelRequest struct {
-	UserID  string
-	Message string
-	Context ContextSummary
-	Tools   []ToolSummary
+	UserID     string
+	Message    string
+	Context    ContextSummary
+	Tools      []ToolSummary
+	History    []Turn
+	PromptBase string
+	Task       string
+}
+
+const TaskSynthesize = "synthesize"
+
+type Usage struct {
+	InputTokens       int    `json:"input_tokens,omitempty"`
+	OutputTokens      int    `json:"output_tokens,omitempty"`
+	CachedInputTokens int    `json:"cached_input_tokens,omitempty"`
+	Model             string `json:"model,omitempty"`
 }
 
 type ModelResponse struct {
 	AssistantMessage string
 	PlannedActions   []PlannedAction
+	Usage            Usage
 }
 
 type ContextBuilder interface {

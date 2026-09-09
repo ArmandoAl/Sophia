@@ -105,17 +105,35 @@ func NewClient(apiKey, model string, opts ...Option) (*Client, error) {
 }
 
 func (c *Client) Generate(ctx context.Context, request runtimedomain.ModelRequest) (runtimedomain.ModelResponse, error) {
+	schema := responseSchema()
+	var systemInstruction *content
+	userContent := request.Message
+	if request.Task == runtimedomain.TaskSynthesize {
+		schema = synthesisResponseSchema()
+	} else {
+		prefix, err := runtimedomain.BuildPromptPrefix(request)
+		if err != nil {
+			return runtimedomain.ModelResponse{}, err
+		}
+		suffix, err := runtimedomain.BuildPromptSuffix(request)
+		if err != nil {
+			return runtimedomain.ModelResponse{}, err
+		}
+		systemInstruction = &content{Role: "system", Parts: []part{{Text: string(prefix)}}}
+		userContent = string(suffix)
+	}
 	payload, err := json.Marshal(geminiRequest{
+		SystemInstruction: systemInstruction,
 		Contents: []content{{
 			Role: "user",
 			Parts: []part{{
-				Text: buildPrompt(request),
+				Text: userContent,
 			}},
 		}},
 		GenerationConfig: generationConfig{
 			Temperature:      0.2,
 			ResponseMimeType: "application/json",
-			ResponseSchema:   responseSchema(),
+			ResponseSchema:   schema,
 		},
 	})
 	if err != nil {
@@ -141,45 +159,14 @@ func (c *Client) Generate(ctx context.Context, request runtimedomain.ModelReques
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return runtimedomain.ModelResponse{}, newGeminiHTTPError(resp.StatusCode, body, c.apiKey)
 	}
-	return parseResponse(body)
+	return parseResponse(body, request.Task, c.model)
 }
 
 func (c *Client) url() string {
 	return fmt.Sprintf("%s/models/%s:generateContent?key=%s", c.endpoint, c.model, c.apiKey)
 }
 
-func buildPrompt(request runtimedomain.ModelRequest) string {
-	payload := map[string]any{
-		"instructions": []string{
-			"You are Sofia's planning runtime. Return JSON only.",
-			"Never execute actions. Only propose actions.",
-			"Only use tools from available_tools.",
-			"Never include user_id, email, token, secret, password, or owner fields in proposed_input.",
-			"Use context_summary.current_datetime as the authoritative current date and time (with UTC offset) to resolve relative expressions like today, tomorrow, or in one hour. Never ask the user what the current date is.",
-			"If uncertain, return no proposed_actions and a concise assistant_message.",
-		},
-		"output_shape": map[string]any{
-			"assistant_message": "string",
-			"proposed_actions": []map[string]any{{
-				"tool_name":             "string",
-				"proposed_input":        "object",
-				"reason":                "string",
-				"risk_level":            "low|medium|high",
-				"requires_confirmation": true,
-			}},
-		},
-		"user_message":    truncate(request.Message, 1000),
-		"context_summary": request.Context,
-		"available_tools": request.Tools,
-	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return `{"instructions":["Return no proposed_actions."]}`
-	}
-	return string(raw)
-}
-
-func parseResponse(body []byte) (runtimedomain.ModelResponse, error) {
+func parseResponse(body []byte, task, model string) (runtimedomain.ModelResponse, error) {
 	var response geminiResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return runtimedomain.ModelResponse{}, fmt.Errorf("%w: %v", ErrInvalidGeminiOutput, err)
@@ -192,6 +179,18 @@ func parseResponse(body []byte) (runtimedomain.ModelResponse, error) {
 	text = strings.TrimPrefix(text, "```")
 	text = strings.TrimSuffix(text, "```")
 	text = strings.TrimSpace(text)
+	usage := runtimedomain.Usage{
+		InputTokens:       response.UsageMetadata.PromptTokenCount,
+		OutputTokens:      response.UsageMetadata.CandidatesTokenCount,
+		CachedInputTokens: response.UsageMetadata.CachedContentTokenCount,
+		Model:             model,
+	}
+	if task == runtimedomain.TaskSynthesize {
+		if !json.Valid([]byte(text)) {
+			return runtimedomain.ModelResponse{}, ErrInvalidGeminiOutput
+		}
+		return runtimedomain.ModelResponse{AssistantMessage: text, Usage: usage}, nil
+	}
 
 	var structured structuredOutput
 	if err := json.Unmarshal([]byte(text), &structured); err != nil {
@@ -200,7 +199,7 @@ func parseResponse(body []byte) (runtimedomain.ModelResponse, error) {
 	if strings.TrimSpace(structured.AssistantMessage) == "" {
 		return runtimedomain.ModelResponse{}, ErrInvalidGeminiOutput
 	}
-	modelResponse := runtimedomain.ModelResponse{AssistantMessage: truncate(structured.AssistantMessage, 500)}
+	modelResponse := runtimedomain.ModelResponse{AssistantMessage: truncate(structured.AssistantMessage, 500), Usage: usage}
 	for _, action := range structured.ProposedActions {
 		if strings.TrimSpace(action.ToolName) == "" || len(action.ProposedInput) == 0 || !json.Valid(action.ProposedInput) {
 			return runtimedomain.ModelResponse{}, ErrInvalidGeminiOutput
@@ -240,8 +239,9 @@ func responseSchema() map[string]any {
 }
 
 type geminiRequest struct {
-	Contents         []content        `json:"contents"`
-	GenerationConfig generationConfig `json:"generationConfig"`
+	SystemInstruction *content         `json:"systemInstruction,omitempty"`
+	Contents          []content        `json:"contents"`
+	GenerationConfig  generationConfig `json:"generationConfig"`
 }
 
 type generationConfig struct {
@@ -259,10 +259,64 @@ type part struct {
 	Text string `json:"text"`
 }
 
+func synthesisResponseSchema() map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"required":             []string{"reinforced", "contradicted", "novel"},
+		"additionalProperties": false,
+		"properties": map[string]any{
+			"reinforced": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type":                 "object",
+					"required":             []string{"belief_id", "evidence", "confidence_delta"},
+					"additionalProperties": false,
+					"properties": map[string]any{
+						"belief_id":        map[string]any{"type": "string"},
+						"evidence":         map[string]any{"type": "string"},
+						"confidence_delta": map[string]any{"type": "number"},
+					},
+				},
+			},
+			"contradicted": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type":                 "object",
+					"required":             []string{"belief_id", "evidence", "note"},
+					"additionalProperties": false,
+					"properties": map[string]any{
+						"belief_id": map[string]any{"type": "string"},
+						"evidence":  map[string]any{"type": "string"},
+						"note":      map[string]any{"type": "string"},
+					},
+				},
+			},
+			"novel": map[string]any{
+				"type": "array",
+				"items": map[string]any{
+					"type":                 "object",
+					"required":             []string{"statement", "category", "confidence"},
+					"additionalProperties": false,
+					"properties": map[string]any{
+						"statement":  map[string]any{"type": "string"},
+						"category":   map[string]any{"type": "string"},
+						"confidence": map[string]any{"type": "number"},
+					},
+				},
+			},
+		},
+	}
+}
+
 type geminiResponse struct {
 	Candidates []struct {
 		Content content `json:"content"`
 	} `json:"candidates"`
+	UsageMetadata struct {
+		PromptTokenCount        int `json:"promptTokenCount"`
+		CandidatesTokenCount    int `json:"candidatesTokenCount"`
+		CachedContentTokenCount int `json:"cachedContentTokenCount"`
+	} `json:"usageMetadata"`
 }
 
 func newGeminiHTTPError(statusCode int, body []byte, apiKey string) *GeminiError {

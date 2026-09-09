@@ -17,6 +17,8 @@ import (
 	"github.com/armandoalvarado/sofia-backend/internal/database"
 	insightsdomain "github.com/armandoalvarado/sofia-backend/internal/insights/domain"
 	insightsinfra "github.com/armandoalvarado/sofia-backend/internal/insights/infrastructure"
+	learningdomain "github.com/armandoalvarado/sofia-backend/internal/learning/domain"
+	learninginfra "github.com/armandoalvarado/sofia-backend/internal/learning/infrastructure"
 	memorydomain "github.com/armandoalvarado/sofia-backend/internal/memory/domain"
 	memoryinfra "github.com/armandoalvarado/sofia-backend/internal/memory/infrastructure"
 	notificationsdomain "github.com/armandoalvarado/sofia-backend/internal/notifications/domain"
@@ -41,6 +43,9 @@ type Repositories struct {
 	Outcomes        insightsdomain.ActivityOutcomeRepository
 	Reflections     insightsdomain.ReflectionRepository
 	Memories        memorydomain.MemoryRepository
+	Beliefs         learningdomain.BeliefRepository
+	PromptVersions  learningdomain.PromptVersionRepository
+	DailySummaries  learningdomain.DailySummaryRepository
 	DeviceTokens    notificationsdomain.DeviceTokenRepository
 	Tools           toolsdomain.ToolDefinitionRepository
 	ActionProposals actionsdomain.AIActionProposalRepository
@@ -64,6 +69,9 @@ func BuildRepositories(cfg config.Config) (*Repositories, error) {
 			Outcomes:        insightsinfra.NewInMemoryActivityOutcomeRepository(),
 			Reflections:     insightsinfra.NewInMemoryReflectionRepository(),
 			Memories:        memoryinfra.NewInMemoryMemoryRepository(),
+			Beliefs:         learninginfra.NewInMemoryBeliefRepository(),
+			PromptVersions:  learninginfra.NewInMemoryPromptVersionRepository(),
+			DailySummaries:  learninginfra.NewInMemoryDailySummaryRepository(),
 			DeviceTokens:    notificationsinfra.NewInMemoryDeviceTokenRepository(),
 			Tools:           toolsinfra.NewInMemoryToolDefinitionRepository(),
 			ActionProposals: actionsinfra.NewInMemoryAIActionProposalRepository(),
@@ -92,6 +100,9 @@ func BuildRepositories(cfg config.Config) (*Repositories, error) {
 		Outcomes:        insightsinfra.NewFirestoreActivityOutcomeRepository(store.Client),
 		Reflections:     insightsinfra.NewFirestoreReflectionRepository(store.Client),
 		Memories:        memoryinfra.NewFirestoreMemoryRepository(store.Client),
+		Beliefs:         learninginfra.NewFirestoreBeliefRepository(store.Client),
+		PromptVersions:  learninginfra.NewFirestorePromptVersionRepository(store.Client),
+		DailySummaries:  learninginfra.NewFirestoreDailySummaryRepository(store.Client),
 		DeviceTokens:    notificationsinfra.NewFirestoreDeviceTokenRepository(store.Client),
 		Tools:           toolsinfra.NewFirestoreToolDefinitionRepository(store.Client),
 		ActionProposals: actionsinfra.NewFirestoreAIActionProposalRepository(store.Client),

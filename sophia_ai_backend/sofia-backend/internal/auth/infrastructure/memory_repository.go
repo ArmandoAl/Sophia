@@ -49,3 +49,13 @@ func (r *InMemoryUserRepository) FindByID(id string) (*domain.User, error) {
 	}
 	return user, nil
 }
+
+func (r *InMemoryUserRepository) ListIDs() ([]string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	ids := make([]string, 0, len(r.usersByID))
+	for id := range r.usersByID {
+		ids = append(ids, id)
+	}
+	return ids, nil
+}

@@ -228,7 +228,7 @@ func runE2E(ctx context.Context, outputDir string) (*e2eReport, error) {
 	report.ProposalID = proposal.ID
 	report.pass("create proposal", proposal.ID)
 
-	confirmed, err := modules.Actions.ConfirmActionProposal(ctx, user.ID, proposal.ID)
+	confirmed, err := modules.Actions.ConfirmActionProposal(ctx, user.ID, proposal.ID, nil, nil)
 	if err != nil {
 		return report, err
 	}

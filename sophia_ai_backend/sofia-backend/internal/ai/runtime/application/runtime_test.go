@@ -20,6 +20,7 @@ import (
 	authinfra "github.com/armandoalvarado/sofia-backend/internal/auth/infrastructure"
 	insightsapp "github.com/armandoalvarado/sofia-backend/internal/insights/application"
 	insightsinfra "github.com/armandoalvarado/sofia-backend/internal/insights/infrastructure"
+	learningdomain "github.com/armandoalvarado/sofia-backend/internal/learning/domain"
 	memoryapp "github.com/armandoalvarado/sofia-backend/internal/memory/application"
 	memorydomain "github.com/armandoalvarado/sofia-backend/internal/memory/domain"
 	memoryinfra "github.com/armandoalvarado/sofia-backend/internal/memory/infrastructure"
@@ -68,6 +69,151 @@ func TestContextBuilderCollectsOnlyUserData(t *testing.T) {
 	}
 }
 
+func TestContextBuilderLoadsPromptBaseWithoutMixingIntoDynamicContext(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-a", "a@example.com")
+	env.contextBuilder.SetPromptBaseReader(stubPromptBaseReader{content: "Prefer morning meetings."})
+
+	summary, err := env.contextBuilder.Build(ctx, user.ID, "plan the day")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.PromptBase != "Prefer morning meetings." {
+		t.Fatalf("expected prompt base, got %q", summary.PromptBase)
+	}
+	raw, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(raw), "Prefer morning meetings.") {
+		t.Fatal("prompt base leaked into the dynamic context payload")
+	}
+}
+
+func TestContextBuilderColdStartWithoutPromptVersion(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	user := env.createUser(t, "user-a", "a@example.com")
+	summary, err := env.contextBuilder.Build(context.Background(), user.ID, "hello")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.PromptBase != "" {
+		t.Fatalf("cold start should have empty prompt base, got %q", summary.PromptBase)
+	}
+}
+
+type stubPromptBaseReader struct {
+	content string
+}
+
+func (s stubPromptBaseReader) ActivePromptContent(context.Context, string) (string, error) {
+	return s.content, nil
+}
+
+func TestContextBuilderRecallsMemoryFromNaturalLanguage(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-a", "a@example.com")
+
+	_, err := env.memories.CreateMemory(ctx, user.ID, memorydomain.MemoryCreate{
+		Title:   "Coffee preference",
+		Content: "Likes coffee before planning the day",
+		Tags:    []string{"planning"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := env.contextBuilder.Build(ctx, user.ID, "Hey can you please remind me what I like about coffee when I am planning my morning?")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.RelevantMemories) != 1 {
+		t.Fatalf("expected natural-language recall to find the coffee memory, got %+v", summary.RelevantMemories)
+	}
+}
+
+func TestContextBuilderRedactsEmailWithoutDroppingMemory(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-a", "a@example.com")
+
+	_, err := env.memories.CreateMemory(ctx, user.ID, memorydomain.MemoryCreate{
+		Title:   "Coffee contact",
+		Content: "Likes coffee",
+		Summary: "Talk to alice@example.com about coffee before planning",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := env.contextBuilder.Build(ctx, user.ID, "coffee planning")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.RelevantMemories) != 1 {
+		t.Fatalf("expected redacted memory, got %+v", summary.RelevantMemories)
+	}
+	title := summary.RelevantMemories[0].Title
+	if title == "[REDACTED]" {
+		t.Fatal("email redaction wiped the whole memory text")
+	}
+	if strings.Contains(title, "alice@example.com") {
+		t.Fatalf("email was not redacted: %q", title)
+	}
+	if !strings.Contains(title, "[email]") || !strings.Contains(title, "Talk to") {
+		t.Fatalf("expected email placeholder with remaining text, got %q", title)
+	}
+}
+
+func TestContextBuilderCountsInsightsInTokenBudget(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-a", "a@example.com")
+
+	summary, err := env.contextBuilder.Build(ctx, user.ID, "para")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.TokenBudget.UsedApproxTokens <= 0 {
+		t.Fatalf("insights should count toward UsedApproxTokens, got %+v", summary.TokenBudget)
+	}
+	if summary.TokenBudget.UsedApproxTokens > summary.TokenBudget.MaxApproxTokens {
+		t.Fatalf("token budget exceeded: %+v", summary.TokenBudget)
+	}
+}
+
+func TestContextBuilderKeepsMemoriesAlongsideActivities(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-a", "a@example.com")
+
+	longTitle := strings.Repeat("activity planning notes ", 8)
+	for i := 0; i < 5; i++ {
+		if _, err := env.activities.CreateActivity(ctx, user.ID, activitiesdomain.ActivityCreate{Title: longTitle, Timezone: "America/Tijuana"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := env.memories.CreateMemory(ctx, user.ID, memorydomain.MemoryCreate{
+		Title:   "Coffee preference",
+		Content: "Likes coffee before planning",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := env.contextBuilder.Build(ctx, user.ID, "Hey can you please remind me what I like about coffee when I am planning my morning?")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(summary.RecentActivities) == 0 {
+		t.Fatal("expected activities in context")
+	}
+	if len(summary.RelevantMemories) != 1 {
+		t.Fatalf("activities should not starve memories, got memories=%+v activities=%d used=%d", summary.RelevantMemories, len(summary.RecentActivities), summary.TokenBudget.UsedApproxTokens)
+	}
+}
+
 func TestContextBuilderSetsCurrentDateTime(t *testing.T) {
 	t.Run("profile timezone", func(t *testing.T) {
 		env := newRuntimeTestEnv(t)
@@ -106,6 +252,7 @@ func TestContextBuilderSetsCurrentDateTime(t *testing.T) {
 			env.insights,
 			env.memories,
 			5,
+			4600,
 		)
 
 		summary, err := builder.Build(context.Background(), user.ID, "hoy")
@@ -220,6 +367,64 @@ func TestRuntimeCreatesSafeProposalWithoutExecuting(t *testing.T) {
 	}
 }
 
+func TestRuntimeAutoExecutesStrongRecentHistory(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-a", "a@example.com")
+	level := usersdomain.AutonomySemiAutonomous
+	if _, err := env.users.UpdateAISettings(user.ID, usersdomain.AISettingsUpdate{AutonomyLevel: &level}); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 36; i++ {
+		proposal, err := env.actions.CreateActionProposal(ctx, user.ID, actionsdomain.ProposalCreate{
+			ToolName:      toolsdomain.ToolCreateReminder,
+			ProposedInput: json.RawMessage(`{"title":"habit","scheduled_at":"2026-09-08T15:00:00Z","timezone":"UTC"}`),
+			RiskLevel:     actionsdomain.RiskMedium,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := env.actions.ConfirmActionProposal(ctx, user.ID, proposal.ID, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for i := 0; i < 4; i++ {
+		proposal, err := env.actions.CreateActionProposal(ctx, user.ID, actionsdomain.ProposalCreate{
+			ToolName:      toolsdomain.ToolCreateReminder,
+			ProposedInput: json.RawMessage(`{"title":"skip","scheduled_at":"2026-09-08T15:00:00Z","timezone":"UTC"}`),
+			RiskLevel:     actionsdomain.RiskMedium,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := env.actions.RejectActionProposal(ctx, user.ID, proposal.ID, "no", nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	safety := runtimeapp.NewSafetyPolicy()
+	safety.SetAutonomy(env.actions, learningdomain.DefaultAutonomyThreshold)
+	env.runtime = runtimeapp.NewRuntimeService(env.contextBuilder, env.toolSelector, runtimeapp.NewPlanner(runtimeinfra.NewFakeModelClient()), safety, env.actions)
+
+	resp, err := env.runtime.HandleMessage(ctx, runtimedomain.RuntimeRequest{
+		UserID:  user.ID,
+		Message: "Recuérdame estudiar mañana",
+		DryRun:  false,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.ProposedActions) != 1 || resp.ProposedActions[0].Status != actionsdomain.StatusExecuted {
+		t.Fatalf("expected auto-executed reminder, got %+v", resp.ProposedActions)
+	}
+	reminders, err := env.reminders.ListReminders(ctx, remindersdomain.ListFilter{UserID: user.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reminders) != 1 {
+		t.Fatalf("expected one reminder after auto-execute, got %+v", reminders)
+	}
+}
+
 func TestRuntimeInvalidModelActionDoesNotCreateProposal(t *testing.T) {
 	env := newRuntimeTestEnv(t)
 	ctx := context.Background()
@@ -251,6 +456,36 @@ func TestRuntimeInvalidModelActionDoesNotCreateProposal(t *testing.T) {
 	}
 }
 
+func TestHandleMessagePassesHistoryToModelRequest(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-a", "a@example.com")
+	recorder := &recordingPlanner{inner: runtimeapp.NewPlanner(runtimeinfra.NewFakeModelClient())}
+	env.runtime = runtimeapp.NewRuntimeService(env.contextBuilder, env.toolSelector, recorder, runtimeapp.NewSafetyPolicy(), env.actions)
+
+	if _, err := env.runtime.HandleMessage(ctx, runtimedomain.RuntimeRequest{
+		UserID:  user.ID,
+		Message: "mejor a las 4",
+		DryRun:  true,
+		History: []runtimedomain.Turn{{Role: "user", Content: "Recuérdame estudiar mañana"}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if len(recorder.requests) != 1 {
+		t.Fatalf("expected 1 model request, got %d", len(recorder.requests))
+	}
+	history := recorder.requests[0].History
+	if len(history) != 1 || history[0].Content != "Recuérdame estudiar mañana" {
+		t.Fatalf("expected prior turn in ModelRequest.History, got %+v", history)
+	}
+	if recorder.requests[0].Context.TokenBudget.MaxApproxTokens != 4600 {
+		t.Fatalf("history should fit into the existing budget, got %+v", recorder.requests[0].Context.TokenBudget)
+	}
+	if recorder.requests[0].Context.TokenBudget.UsedApproxTokens <= 0 {
+		t.Fatalf("history was not counted in token budget: %+v", recorder.requests[0].Context.TokenBudget)
+	}
+}
+
 func TestRuntimeAuditMetadataDoesNotIncludeFullPrompt(t *testing.T) {
 	env := newRuntimeTestEnv(t)
 	ctx := context.Background()
@@ -271,7 +506,9 @@ func TestRuntimeAuditMetadataDoesNotIncludeFullPrompt(t *testing.T) {
 	if strings.Contains(string(raw), prompt) {
 		t.Fatalf("audit metadata leaked full prompt: %s", raw)
 	}
-	if !strings.Contains(string(raw), "request_id") || !strings.Contains(string(raw), "provider_latency_ms") {
+	if !strings.Contains(string(raw), "request_id") || !strings.Contains(string(raw), "provider_latency_ms") ||
+		!strings.Contains(string(raw), "input_tokens") || !strings.Contains(string(raw), "output_tokens") ||
+		!strings.Contains(string(raw), "cached_input_tokens") {
 		t.Fatalf("expected observability metadata, got %s", raw)
 	}
 }
@@ -289,6 +526,20 @@ func (invalidActionModel) Generate(context.Context, runtimedomain.ModelRequest) 
 			RiskLevel:     actionsdomain.RiskMedium,
 		}},
 	}, nil
+}
+
+type recordingPlanner struct {
+	inner    runtimedomain.Planner
+	requests []runtimedomain.ModelRequest
+}
+
+func (p *recordingPlanner) Plan(ctx context.Context, request runtimedomain.ModelRequest) (runtimedomain.ModelResponse, error) {
+	copied := request
+	if request.History != nil {
+		copied.History = append([]runtimedomain.Turn(nil), request.History...)
+	}
+	p.requests = append(p.requests, copied)
+	return p.inner.Plan(ctx, request)
 }
 
 type recordingAuditRecorder struct {
@@ -356,7 +607,7 @@ func newRuntimeTestEnv(t *testing.T) *runtimeTestEnv {
 	actions := actionsapp.NewService(actionRepo, tools, users, activities, reminders, memories)
 	activities.SetReminderBridge(reminders)
 
-	contextBuilder := runtimeapp.NewContextBuilder(users, activities, reminders, insights, memories, 5)
+	contextBuilder := runtimeapp.NewContextBuilder(users, activities, reminders, insights, memories, 5, 4600)
 	toolSelector := runtimeapp.NewToolSelector(tools)
 	planner := runtimeapp.NewPlanner(runtimeinfra.NewFakeModelClient())
 	runtime := runtimeapp.NewRuntimeService(contextBuilder, toolSelector, planner, runtimeapp.NewSafetyPolicy(), actions)

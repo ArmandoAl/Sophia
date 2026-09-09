@@ -71,6 +71,7 @@ type Memory struct {
 	Tags           []string
 	Visibility     string
 	Status         string
+	SearchTerms    []string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	LastAccessedAt *time.Time
@@ -130,6 +131,7 @@ type MemoryRepository interface {
 	Archive(ctx context.Context, userID, memoryID string) (*Memory, error)
 	DeleteSoft(ctx context.Context, userID, memoryID string) (*Memory, error)
 	SearchBasic(ctx context.Context, filter SearchFilter) ([]*Memory, error)
+	SearchByTerms(ctx context.Context, userID string, terms []string, limit int) ([]*Memory, error)
 	TouchAccessed(ctx context.Context, userID, memoryID string) error
 }
 
@@ -152,6 +154,7 @@ func NewMemory(id, userID string, input MemoryCreate) (*Memory, error) {
 		CreatedAt:  now,
 		UpdatedAt:  now,
 	}
+	memory.refreshSearchTerms()
 	if err := memory.Validate(); err != nil {
 		return nil, err
 	}
@@ -193,6 +196,7 @@ func (m *Memory) Apply(update MemoryUpdate) error {
 		m.Status = strings.TrimSpace(*update.Status)
 	}
 	m.UpdatedAt = time.Now()
+	m.refreshSearchTerms()
 	return m.Validate()
 }
 
@@ -243,6 +247,10 @@ func (m *Memory) Validate() error {
 		return ErrInvalidImportance
 	}
 	return nil
+}
+
+func (m *Memory) refreshSearchTerms() {
+	m.SearchTerms = ExtractTerms(strings.Join([]string{m.Title, m.Summary, m.Content, strings.Join(m.Tags, " ")}, " "), 40)
 }
 
 func ValidateListFilter(filter ListFilter) error {

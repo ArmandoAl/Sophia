@@ -105,11 +105,23 @@ func NewClient(apiKey, model string, opts ...Option) (*Client, error) {
 }
 
 func (c *Client) Generate(ctx context.Context, request runtimedomain.ModelRequest) (runtimedomain.ModelResponse, error) {
+	system, err := runtimedomain.BuildPromptPrefix(request)
+	if err != nil {
+		return runtimedomain.ModelResponse{}, err
+	}
+	userContent, err := runtimedomain.BuildPromptSuffix(request)
+	if err != nil {
+		return runtimedomain.ModelResponse{}, err
+	}
+	if request.Task == runtimedomain.TaskSynthesize {
+		system = []byte(synthesisSystemPrompt())
+		userContent = []byte(request.Message)
+	}
 	payload, err := json.Marshal(deepSeekRequest{
 		Model: c.model,
 		Messages: []message{
-			{Role: "system", Content: systemPrompt()},
-			{Role: "user", Content: buildUserContent(request)},
+			{Role: "system", Content: string(system)},
+			{Role: "user", Content: string(userContent)},
 		},
 		Temperature:    0.2,
 		ResponseFormat: responseFormat{Type: "json_object"},
@@ -138,48 +150,22 @@ func (c *Client) Generate(ctx context.Context, request runtimedomain.ModelReques
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return runtimedomain.ModelResponse{}, newDeepSeekHTTPError(resp.StatusCode, body, c.apiKey)
 	}
-	return parseResponse(body)
+	return parseResponse(body, request.Task, c.model)
 }
 
 func (c *Client) url() string {
 	return c.endpoint + "/chat/completions"
 }
 
-func systemPrompt() string {
+func synthesisSystemPrompt() string {
 	return strings.Join([]string{
-		"You are Sofia's planning runtime. Return JSON only.",
-		"Never execute actions. Only propose actions.",
-		"Only use tools from available_tools.",
-		"Never include user_id, email, token, secret, password, or owner fields in proposed_input.",
-		"Use context_summary.current_datetime as the authoritative current date and time (with UTC offset) to resolve relative expressions like today, tomorrow, or in one hour. Never ask the user what the current date is.",
-		"If uncertain, return no proposed_actions and a concise assistant_message.",
+		"You synthesize Sofia's user beliefs from DECISIONS only.",
+		"Never read conversations, messages, or chat transcripts.",
+		"Return JSON only with reinforced, contradicted, and novel.",
 	}, "\n")
 }
 
-func buildUserContent(request runtimedomain.ModelRequest) string {
-	payload := map[string]any{
-		"output_shape": map[string]any{
-			"assistant_message": "string",
-			"proposed_actions": []map[string]any{{
-				"tool_name":             "string",
-				"proposed_input":        "object",
-				"reason":                "string",
-				"risk_level":            "low|medium|high",
-				"requires_confirmation": true,
-			}},
-		},
-		"user_message":    truncate(request.Message, 1000),
-		"context_summary": request.Context,
-		"available_tools": request.Tools,
-	}
-	raw, err := json.Marshal(payload)
-	if err != nil {
-		return `{"output_shape":{"assistant_message":"string","proposed_actions":[]}}`
-	}
-	return string(raw)
-}
-
-func parseResponse(body []byte) (runtimedomain.ModelResponse, error) {
+func parseResponse(body []byte, task, model string) (runtimedomain.ModelResponse, error) {
 	var response deepSeekResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return runtimedomain.ModelResponse{}, fmt.Errorf("%w: %v", ErrInvalidDeepSeekOutput, err)
@@ -192,6 +178,18 @@ func parseResponse(body []byte) (runtimedomain.ModelResponse, error) {
 	text = strings.TrimPrefix(text, "```")
 	text = strings.TrimSuffix(text, "```")
 	text = strings.TrimSpace(text)
+	usage := runtimedomain.Usage{
+		InputTokens:       response.Usage.PromptTokens,
+		OutputTokens:      response.Usage.CompletionTokens,
+		CachedInputTokens: response.Usage.PromptCacheHitTokens,
+		Model:             model,
+	}
+	if task == runtimedomain.TaskSynthesize {
+		if !json.Valid([]byte(text)) {
+			return runtimedomain.ModelResponse{}, ErrInvalidDeepSeekOutput
+		}
+		return runtimedomain.ModelResponse{AssistantMessage: text, Usage: usage}, nil
+	}
 
 	var structured structuredOutput
 	if err := json.Unmarshal([]byte(text), &structured); err != nil {
@@ -200,7 +198,7 @@ func parseResponse(body []byte) (runtimedomain.ModelResponse, error) {
 	if strings.TrimSpace(structured.AssistantMessage) == "" {
 		return runtimedomain.ModelResponse{}, ErrInvalidDeepSeekOutput
 	}
-	modelResponse := runtimedomain.ModelResponse{AssistantMessage: truncate(structured.AssistantMessage, 500)}
+	modelResponse := runtimedomain.ModelResponse{AssistantMessage: truncate(structured.AssistantMessage, 500), Usage: usage}
 	for _, action := range structured.ProposedActions {
 		if strings.TrimSpace(action.ToolName) == "" || len(action.ProposedInput) == 0 || !json.Valid(action.ProposedInput) {
 			return runtimedomain.ModelResponse{}, ErrInvalidDeepSeekOutput
@@ -235,6 +233,11 @@ type deepSeekResponse struct {
 	Choices []struct {
 		Message message `json:"message"`
 	} `json:"choices"`
+	Usage struct {
+		PromptTokens         int `json:"prompt_tokens"`
+		CompletionTokens     int `json:"completion_tokens"`
+		PromptCacheHitTokens int `json:"prompt_cache_hit_tokens"`
+	} `json:"usage"`
 }
 
 func newDeepSeekHTTPError(statusCode int, body []byte, apiKey string) *DeepSeekError {

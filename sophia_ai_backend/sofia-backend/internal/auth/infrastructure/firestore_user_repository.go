@@ -132,6 +132,25 @@ func (r *FirestoreUserRepository) FindByID(id string) (*domain.User, error) {
 	return documentToDomainUser(doc)
 }
 
+func (r *FirestoreUserRepository) ListIDs() ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), r.timeout)
+	defer cancel()
+	iter := r.client.Collection(usersCollection).Documents(ctx)
+	defer iter.Stop()
+	ids := make([]string, 0)
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, doc.Ref.ID)
+	}
+	return ids, nil
+}
+
 func domainToFirestoreUser(user *domain.User) firestoreUser {
 	return firestoreUser{
 		ID:           user.ID,

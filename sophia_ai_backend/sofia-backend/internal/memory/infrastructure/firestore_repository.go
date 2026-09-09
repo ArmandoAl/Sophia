@@ -12,6 +12,8 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+var _ domain.MemoryRepository = (*FirestoreMemoryRepository)(nil)
+
 const memoriesCollection = "memories"
 
 type FirestoreMemoryRepository struct {
@@ -33,6 +35,7 @@ type firestoreMemory struct {
 	Tags           []string   `firestore:"tags"`
 	Visibility     string     `firestore:"visibility"`
 	Status         string     `firestore:"status"`
+	SearchTerms    []string   `firestore:"search_terms"`
 	CreatedAt      time.Time  `firestore:"created_at"`
 	UpdatedAt      time.Time  `firestore:"updated_at"`
 	LastAccessedAt *time.Time `firestore:"last_accessed_at,omitempty"`
@@ -160,6 +163,31 @@ func (r *FirestoreMemoryRepository) SearchBasic(ctx context.Context, filter doma
 	return result, nil
 }
 
+func (r *FirestoreMemoryRepository) SearchByTerms(ctx context.Context, userID string, terms []string, limit int) ([]*domain.Memory, error) {
+	terms = domain.CapSearchTerms(terms)
+	if len(terms) == 0 {
+		return []*domain.Memory{}, nil
+	}
+	if limit <= 0 {
+		limit = domain.DefaultSearchLimit()
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+
+	query := r.client.Collection(memoriesCollection).
+		Where("user_id", "==", userID).
+		Where("status", "==", domain.StatusActive).
+		Where("search_terms", "array-contains-any", terms).
+		Limit(limit * 4)
+
+	memories, err := r.collectQuery(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	return domain.RankByTermMatches(memories, terms, limit), nil
+}
+
 func (r *FirestoreMemoryRepository) TouchAccessed(ctx context.Context, userID, memoryID string) error {
 	memory, err := r.FindByID(ctx, userID, memoryID)
 	if err != nil {
@@ -218,6 +246,28 @@ func (r *FirestoreMemoryRepository) collect(ctx context.Context, query firestore
 	return result, nil
 }
 
+func (r *FirestoreMemoryRepository) collectQuery(ctx context.Context, query firestore.Query) ([]*domain.Memory, error) {
+	iter := query.Documents(ctx)
+	defer iter.Stop()
+
+	result := make([]*domain.Memory, 0)
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		memory, err := documentToMemory(doc)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, memory)
+	}
+	return result, nil
+}
+
 func memoryToDocument(memory *domain.Memory) firestoreMemory {
 	return firestoreMemory{
 		ID:             memory.ID,
@@ -233,6 +283,7 @@ func memoryToDocument(memory *domain.Memory) firestoreMemory {
 		Tags:           append([]string(nil), memory.Tags...),
 		Visibility:     memory.Visibility,
 		Status:         memory.Status,
+		SearchTerms:    append([]string(nil), memory.SearchTerms...),
 		CreatedAt:      memory.CreatedAt,
 		UpdatedAt:      memory.UpdatedAt,
 		LastAccessedAt: memory.LastAccessedAt,
@@ -262,6 +313,7 @@ func (m firestoreMemory) toDomain() *domain.Memory {
 		Tags:           append([]string(nil), m.Tags...),
 		Visibility:     m.Visibility,
 		Status:         m.Status,
+		SearchTerms:    append([]string(nil), m.SearchTerms...),
 		CreatedAt:      m.CreatedAt,
 		UpdatedAt:      m.UpdatedAt,
 		LastAccessedAt: m.LastAccessedAt,

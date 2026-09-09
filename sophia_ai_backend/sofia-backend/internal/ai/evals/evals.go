@@ -17,6 +17,7 @@ import (
 	runtimeinfra "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/infrastructure"
 	authdomain "github.com/armandoalvarado/sofia-backend/internal/auth/domain"
 	authinfra "github.com/armandoalvarado/sofia-backend/internal/auth/infrastructure"
+	"github.com/armandoalvarado/sofia-backend/internal/config"
 	insightsapp "github.com/armandoalvarado/sofia-backend/internal/insights/application"
 	insightsinfra "github.com/armandoalvarado/sofia-backend/internal/insights/infrastructure"
 	memoryapp "github.com/armandoalvarado/sofia-backend/internal/memory/application"
@@ -491,7 +492,7 @@ func newEnv() *env {
 }
 
 func (e *env) newRuntime(model runtimedomain.ModelClient) *runtimeapp.RuntimeService {
-	contextBuilder := runtimeapp.NewContextBuilder(e.users, e.activities, e.reminders, e.insights, e.memories, 5)
+	contextBuilder := runtimeapp.NewContextBuilder(e.users, e.activities, e.reminders, e.insights, e.memories, 5, config.DefaultContextTokenBudget)
 	toolSelector := runtimeapp.NewToolSelector(e.tools)
 	planner := runtimeapp.NewPlanner(model)
 	return runtimeapp.NewRuntimeService(contextBuilder, toolSelector, planner, runtimeapp.NewSafetyPolicy(), e.actions)

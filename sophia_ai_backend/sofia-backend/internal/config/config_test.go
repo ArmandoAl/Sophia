@@ -11,6 +11,7 @@ func TestLoadDefaultsDevelopment(t *testing.T) {
 	t.Setenv("JWT_SECRET", "")
 	t.Setenv("PERSISTENCE_DRIVER", "")
 	t.Setenv("REQUEST_BODY_LIMIT_BYTES", "")
+	t.Setenv("CONTEXT_TOKEN_BUDGET", "")
 
 	cfg, err := Load()
 	if err != nil {
@@ -35,8 +36,27 @@ func TestLoadDefaultsDevelopment(t *testing.T) {
 	if cfg.AIModelProvider != "fake" {
 		t.Fatalf("expected fake model provider, got %q", cfg.AIModelProvider)
 	}
+	if cfg.ContextTokenBudget != 4600 {
+		t.Fatalf("expected context token budget 4600, got %d", cfg.ContextTokenBudget)
+	}
 	if !cfg.AIRuntimeProposalOnly {
 		t.Fatal("expected proposal-only runtime by default")
+	}
+	if cfg.AutonomyThreshold != 0.85 {
+		t.Fatalf("expected default autonomy threshold 0.85, got %v", cfg.AutonomyThreshold)
+	}
+}
+
+func TestLoadContextTokenBudget(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("CONTEXT_TOKEN_BUDGET", "3200")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ContextTokenBudget != 3200 {
+		t.Fatalf("expected context token budget 3200, got %d", cfg.ContextTokenBudget)
 	}
 }
 
@@ -152,6 +172,37 @@ func TestLoadReminderWorkerConfig(t *testing.T) {
 	}
 }
 
+func TestLoadSynthesisWorkerConfig(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("SYNTHESIS_WORKER_ENABLED", "true")
+	t.Setenv("SYNTHESIS_WORKER_ID", "synth-a")
+	t.Setenv("SYNTHESIS_WORKER_INTERVAL", "2m")
+	t.Setenv("SYNTHESIS_WORKER_LEASE", "90s")
+	t.Setenv("SYNTHESIS_RUN_HOUR_LOCAL", "4")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if !cfg.SynthesisWorkerEnabled {
+		t.Fatal("expected synthesis worker enabled")
+	}
+	if cfg.SynthesisWorkerID != "synth-a" {
+		t.Fatalf("expected synth-a, got %q", cfg.SynthesisWorkerID)
+	}
+	if cfg.SynthesisWorkerInterval != 2*time.Minute || cfg.SynthesisWorkerLease != 90*time.Second || cfg.SynthesisRunHourLocal != 4 {
+		t.Fatalf("unexpected synthesis config: %+v", cfg)
+	}
+}
+
+func TestLoadRejectsInvalidSynthesisRunHour(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("SYNTHESIS_RUN_HOUR_LOCAL", "24")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected invalid SYNTHESIS_RUN_HOUR_LOCAL error")
+	}
+}
+
 func TestLoadRejectsInvalidReminderWorkerBatchSize(t *testing.T) {
 	t.Setenv("ENV", "test")
 	t.Setenv("REMINDER_WORKER_BATCH_SIZE", "0")
@@ -264,5 +315,25 @@ func TestLoadRejectsNonProposalOnlyRuntime(t *testing.T) {
 
 	if _, err := Load(); err == nil {
 		t.Fatal("expected AI_RUNTIME_PROPOSAL_ONLY=false error")
+	}
+}
+
+func TestLoadAutonomyThreshold(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("AUTONOMY_THRESHOLD", "0.9")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load returned error: %v", err)
+	}
+	if cfg.AutonomyThreshold != 0.9 {
+		t.Fatalf("expected 0.9, got %v", cfg.AutonomyThreshold)
+	}
+}
+
+func TestLoadRejectsInvalidAutonomyThreshold(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("AUTONOMY_THRESHOLD", "1.5")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected invalid AUTONOMY_THRESHOLD error")
 	}
 }

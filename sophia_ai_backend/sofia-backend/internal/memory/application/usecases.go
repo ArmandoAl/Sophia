@@ -120,6 +120,19 @@ func (s *Service) SearchMemory(ctx context.Context, filter domain.SearchFilter) 
 	return s.repo.SearchBasic(ctx, filter)
 }
 
+func (s *Service) SearchByTerms(ctx context.Context, userID string, terms []string, limit int) ([]*domain.Memory, error) {
+	if err := s.ensureMemoryEnabled(userID); err != nil {
+		return nil, err
+	}
+	if len(terms) == 0 {
+		return []*domain.Memory{}, nil
+	}
+	if limit <= 0 {
+		limit = domain.DefaultSearchLimit()
+	}
+	return s.repo.SearchByTerms(ctx, userID, terms, limit)
+}
+
 func (s *Service) ensureMemoryEnabled(userID string) error {
 	if s.settings == nil {
 		return nil

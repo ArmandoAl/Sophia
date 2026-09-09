@@ -10,6 +10,8 @@ import (
 	"github.com/armandoalvarado/sofia-backend/internal/memory/domain"
 )
 
+var _ domain.MemoryRepository = (*InMemoryMemoryRepository)(nil)
+
 type InMemoryMemoryRepository struct {
 	mu       sync.Mutex
 	memories map[string]*domain.Memory
@@ -105,6 +107,31 @@ func (r *InMemoryMemoryRepository) SearchBasic(ctx context.Context, filter domai
 		result = result[:filter.Limit]
 	}
 	return result, nil
+}
+
+func (r *InMemoryMemoryRepository) SearchByTerms(ctx context.Context, userID string, terms []string, limit int) ([]*domain.Memory, error) {
+	terms = domain.CapSearchTerms(terms)
+	if len(terms) == 0 {
+		return []*domain.Memory{}, nil
+	}
+	if limit <= 0 {
+		limit = domain.DefaultSearchLimit()
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	candidates := make([]*domain.Memory, 0)
+	for _, memory := range r.memories {
+		if memory.UserID != userID || memory.Status != domain.StatusActive {
+			continue
+		}
+		if domain.CountTermMatches(memory, terms) == 0 {
+			continue
+		}
+		candidates = append(candidates, cloneMemory(memory))
+	}
+	return domain.RankByTermMatches(candidates, terms, limit), nil
 }
 
 func (r *InMemoryMemoryRepository) TouchAccessed(ctx context.Context, userID, memoryID string) error {
@@ -219,6 +246,7 @@ func cloneMemory(memory *domain.Memory) *domain.Memory {
 	}
 	cp := *memory
 	cp.Tags = append([]string(nil), memory.Tags...)
+	cp.SearchTerms = append([]string(nil), memory.SearchTerms...)
 	cp.LastAccessedAt = cloneTime(memory.LastAccessedAt)
 	return &cp
 }

@@ -1,6 +1,7 @@
 package application
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 
 	activitiesdomain "github.com/armandoalvarado/sofia-backend/internal/activities/domain"
 	actionsdomain "github.com/armandoalvarado/sofia-backend/internal/ai/actions/domain"
+	learningdomain "github.com/armandoalvarado/sofia-backend/internal/learning/domain"
 	memorydomain "github.com/armandoalvarado/sofia-backend/internal/memory/domain"
 	"github.com/armandoalvarado/sofia-backend/internal/platform/jsonschema"
 	remindersdomain "github.com/armandoalvarado/sofia-backend/internal/reminders/domain"
@@ -36,6 +38,11 @@ type ReminderCreator interface {
 
 type MemoryCreator interface {
 	CreateMemory(ctx context.Context, userID string, input memorydomain.MemoryCreate) (*memorydomain.Memory, error)
+}
+
+type BeliefSearcher interface {
+	SearchBeliefs(ctx context.Context, userID string, terms []string, limit int) ([]*learningdomain.Belief, error)
+	GetBelief(ctx context.Context, userID, beliefID string) (*learningdomain.Belief, error)
 }
 
 type AuditRecorder interface {
@@ -85,18 +92,42 @@ type Service struct {
 	activities ActivityCreator
 	reminders  ReminderCreator
 	memories   MemoryCreator
+	beliefs    BeliefSearcher
 	executors  *ExecutorRegistry
 	audit      AuditRecorder
+	threshold  float64
+	now        func() time.Time
 }
 
 func NewService(repo actionsdomain.AIActionProposalRepository, tools ToolReader, settings AISettingsReader, activities ActivityCreator, reminders ReminderCreator, memories MemoryCreator) *Service {
-	service := &Service{repo: repo, tools: tools, settings: settings, activities: activities, reminders: reminders, memories: memories, executors: NewExecutorRegistry()}
+	service := &Service{
+		repo:       repo,
+		tools:      tools,
+		settings:   settings,
+		activities: activities,
+		reminders:  reminders,
+		memories:   memories,
+		executors:  NewExecutorRegistry(),
+		threshold:  learningdomain.DefaultAutonomyThreshold,
+		now:        time.Now,
+	}
 	service.registerDefaultExecutors()
 	return service
 }
 
 func (s *Service) SetAuditRecorder(audit AuditRecorder) {
 	s.audit = audit
+}
+
+func (s *Service) SetBeliefSearcher(beliefs BeliefSearcher) {
+	s.beliefs = beliefs
+}
+
+func (s *Service) SetAutonomyThreshold(threshold float64) {
+	if threshold < 0 || threshold > 1 {
+		threshold = learningdomain.DefaultAutonomyThreshold
+	}
+	s.threshold = threshold
 }
 
 func (s *Service) CreateActionProposal(ctx context.Context, userID string, input actionsdomain.ProposalCreate) (*actionsdomain.AIActionProposal, error) {
@@ -114,6 +145,7 @@ func (s *Service) CreateActionProposal(ctx context.Context, userID string, input
 	if err != nil {
 		return nil, err
 	}
+	s.applyPrediction(ctx, userID, tool, proposal)
 	if err := s.repo.Create(ctx, proposal); err != nil {
 		return nil, err
 	}
@@ -142,13 +174,25 @@ func (s *Service) GetActionProposal(ctx context.Context, userID, proposalID stri
 	return proposal, nil
 }
 
-func (s *Service) ConfirmActionProposal(ctx context.Context, userID, proposalID string) (*actionsdomain.AIActionProposal, error) {
+func (s *Service) ConfirmActionProposal(ctx context.Context, userID, proposalID string, correctedInput json.RawMessage, decisionLatencyMS *int64) (*actionsdomain.AIActionProposal, error) {
 	proposal, err := s.GetActionProposal(ctx, userID, proposalID)
 	if err != nil {
 		return nil, err
 	}
-	if err := proposal.Confirm(); err != nil {
+	if len(bytes.TrimSpace(correctedInput)) > 0 && !bytes.Equal(bytes.TrimSpace(correctedInput), []byte("null")) {
+		tool, err := s.getEnabledTool(ctx, proposal.ToolName)
+		if err != nil {
+			return nil, err
+		}
+		if err := jsonschema.Validate(tool.InputSchema, correctedInput); err != nil {
+			return nil, actionsdomain.ErrInvalidProposedInput
+		}
+	}
+	if err := proposal.Confirm(correctedInput); err != nil {
 		return nil, err
+	}
+	if decisionLatencyMS != nil {
+		proposal.DecisionLatencyMS = *decisionLatencyMS
 	}
 	if err := s.repo.Update(ctx, proposal); err != nil {
 		return nil, err
@@ -157,13 +201,16 @@ func (s *Service) ConfirmActionProposal(ctx context.Context, userID, proposalID 
 	return proposal, nil
 }
 
-func (s *Service) RejectActionProposal(ctx context.Context, userID, proposalID string) (*actionsdomain.AIActionProposal, error) {
+func (s *Service) RejectActionProposal(ctx context.Context, userID, proposalID string, reason string, decisionLatencyMS *int64) (*actionsdomain.AIActionProposal, error) {
 	proposal, err := s.GetActionProposal(ctx, userID, proposalID)
 	if err != nil {
 		return nil, err
 	}
-	if err := proposal.Reject(); err != nil {
+	if err := proposal.Reject(reason); err != nil {
 		return nil, err
+	}
+	if decisionLatencyMS != nil {
+		proposal.DecisionLatencyMS = *decisionLatencyMS
 	}
 	if err := s.repo.Update(ctx, proposal); err != nil {
 		return nil, err
@@ -213,6 +260,234 @@ func (s *Service) ExecuteConfirmedActionProposal(ctx context.Context, userID, pr
 	return proposal, nil
 }
 
+func (s *Service) AutoExecuteActionProposal(ctx context.Context, userID, proposalID string) (*actionsdomain.AIActionProposal, error) {
+	proposal, err := s.GetActionProposal(ctx, userID, proposalID)
+	if err != nil {
+		return nil, err
+	}
+	if proposal.Status != actionsdomain.StatusProposed {
+		return nil, actionsdomain.ErrInvalidTransition
+	}
+	settings, err := s.settings.GetAISettings(userID)
+	if err != nil && !errors.Is(err, usersdomain.ErrAISettingsNotFound) {
+		return nil, err
+	}
+	level := usersdomain.AutonomySuggestive
+	if settings != nil {
+		level = settings.AutonomyLevel
+	}
+	if level != usersdomain.AutonomySemiAutonomous {
+		return nil, actionsdomain.ErrAutonomyNotAllowed
+	}
+	decision, err := s.EvaluateAutonomy(ctx, userID, proposal.ToolName)
+	if err != nil {
+		return nil, err
+	}
+	if !decision.AutoExecute {
+		return nil, actionsdomain.ErrAutonomyNotAllowed
+	}
+	if !s.hasExecutor(proposal.ToolName) {
+		return proposal, nil
+	}
+
+	result, execErr := s.executors.Execute(ctx, userID, proposal)
+	if execErr != nil {
+		_ = proposal.MarkFailed(execErr.Error())
+		proposal.AutonomyModeUsed = actionsdomain.AutonomyModeAutoExecuted
+		if err := s.repo.Update(ctx, proposal); err != nil {
+			return nil, err
+		}
+		s.recordAudit(ctx, userID, "ai_action_proposal_failed", "ai_action_proposal", proposal.ID, map[string]any{
+			"tool_name": proposal.ToolName,
+			"error":     execErr.Error(),
+		})
+		return proposal, nil
+	}
+	if err := proposal.MarkExecuted(result); err != nil {
+		return nil, err
+	}
+	proposal.AutonomyModeUsed = actionsdomain.AutonomyModeAutoExecuted
+	if err := s.repo.Update(ctx, proposal); err != nil {
+		return nil, err
+	}
+	s.recordAudit(ctx, userID, "ai_action_proposal_auto_executed", "ai_action_proposal", proposal.ID, map[string]any{
+		"tool_name":          proposal.ToolName,
+		"predicted_approval": proposal.PredictedApproval,
+		"prediction_basis":   proposal.PredictionBasis,
+		"prediction_model":   proposal.PredictionModelVersion,
+	})
+	return proposal, nil
+}
+
+type AutonomyDecision struct {
+	Probability  float64
+	Basis        []string
+	History      learningdomain.ToolHistory
+	Reversible   bool
+	AutoExecute  bool
+	ModelVersion string
+	Beliefs      []learningdomain.ScoredBelief
+}
+
+type ProposalExplanation struct {
+	PredictedApproval      float64                    `json:"predicted_approval"`
+	PredictionBasis        []string                   `json:"prediction_basis"`
+	PredictionModelVersion string                     `json:"prediction_model_version"`
+	AutonomyModeUsed       string                     `json:"autonomy_mode_used"`
+	ToolHistory            learningdomain.ToolHistory `json:"tool_history"`
+	Beliefs                []explainedBelief          `json:"beliefs"`
+}
+
+type explainedBelief struct {
+	ID          string  `json:"id"`
+	Statement   string  `json:"statement,omitempty"`
+	Confidence  float64 `json:"confidence"`
+	Contradicts bool    `json:"contradicts"`
+}
+
+func (s *Service) EvaluateAutonomy(ctx context.Context, userID, toolName string) (AutonomyDecision, error) {
+	tool, err := s.getEnabledTool(ctx, toolName)
+	if err != nil {
+		return AutonomyDecision{}, err
+	}
+	history, err := s.toolHistory(ctx, userID, toolName)
+	if err != nil {
+		return AutonomyDecision{}, err
+	}
+	beliefs, err := s.beliefsForTool(ctx, userID, tool)
+	if err != nil {
+		return AutonomyDecision{}, err
+	}
+	probability, basis := learningdomain.PredictApproval(history, beliefs)
+	return AutonomyDecision{
+		Probability:  probability,
+		Basis:        basis,
+		History:      history,
+		Reversible:   tool.Reversible,
+		AutoExecute:  learningdomain.ShouldAutoExecute(probability, history, tool.Reversible, s.threshold),
+		ModelVersion: actionsdomain.PredictionModelHeuristicV1,
+		Beliefs:      beliefs,
+	}, nil
+}
+
+func (s *Service) ExplainActionProposal(ctx context.Context, userID, proposalID string) (*ProposalExplanation, error) {
+	proposal, err := s.GetActionProposal(ctx, userID, proposalID)
+	if err != nil {
+		return nil, err
+	}
+	decision, err := s.EvaluateAutonomy(ctx, userID, proposal.ToolName)
+	if err != nil {
+		return nil, err
+	}
+	explained := make([]explainedBelief, 0, len(decision.Beliefs))
+	for _, belief := range decision.Beliefs {
+		item := explainedBelief{ID: belief.ID, Confidence: belief.Confidence, Contradicts: belief.Contradicts}
+		if s.beliefs != nil {
+			if stored, err := s.beliefs.GetBelief(ctx, userID, belief.ID); err == nil && stored != nil {
+				item.Statement = stored.Statement
+			}
+		}
+		explained = append(explained, item)
+	}
+	return &ProposalExplanation{
+		PredictedApproval:      proposal.PredictedApproval,
+		PredictionBasis:        append([]string(nil), proposal.PredictionBasis...),
+		PredictionModelVersion: proposal.PredictionModelVersion,
+		AutonomyModeUsed:       proposal.AutonomyModeUsed,
+		ToolHistory:            decision.History,
+		Beliefs:                explained,
+	}, nil
+}
+
+func (s *Service) applyPrediction(ctx context.Context, userID string, tool *toolsdomain.ToolDefinition, proposal *actionsdomain.AIActionProposal) {
+	decision, err := s.EvaluateAutonomy(ctx, userID, tool.Name)
+	if err != nil {
+		proposal.PredictedApproval = 0.5
+		proposal.PredictionModelVersion = actionsdomain.PredictionModelHeuristicV1
+		proposal.AutonomyModeUsed = actionsdomain.AutonomyModeProposed
+		return
+	}
+	proposal.PredictedApproval = decision.Probability
+	proposal.PredictionBasis = append([]string(nil), decision.Basis...)
+	proposal.PredictionModelVersion = decision.ModelVersion
+	proposal.AutonomyModeUsed = actionsdomain.AutonomyModeProposed
+}
+
+func (s *Service) toolHistory(ctx context.Context, userID, toolName string) (learningdomain.ToolHistory, error) {
+	now := s.now()
+	from := now.AddDate(-2, 0, 0)
+	proposals, err := s.repo.ListByDateRange(ctx, userID, from, now.Add(time.Second))
+	if err != nil {
+		return learningdomain.ToolHistory{}, err
+	}
+	history := learningdomain.ToolHistory{}
+	var last time.Time
+	for _, proposal := range proposals {
+		if proposal.ToolName != toolName {
+			continue
+		}
+		switch proposal.Feedback {
+		case actionsdomain.FeedbackApprovedDirect:
+			history.Total++
+			history.ApprovedDirect++
+		case actionsdomain.FeedbackApprovedCorrected:
+			history.Total++
+			history.ApprovedCorrected++
+		case actionsdomain.FeedbackRejected:
+			history.Total++
+			history.Rejected++
+		default:
+			continue
+		}
+		at := proposal.CreatedAt
+		if proposal.DecidedAt != nil && !proposal.DecidedAt.IsZero() {
+			at = *proposal.DecidedAt
+		}
+		if last.IsZero() || at.After(last) {
+			last = at
+		}
+	}
+	if !last.IsZero() {
+		history.DaysSinceLastSample = now.Sub(last).Hours() / 24
+		if history.DaysSinceLastSample < 0 {
+			history.DaysSinceLastSample = 0
+		}
+	}
+	return history, nil
+}
+
+func (s *Service) beliefsForTool(ctx context.Context, userID string, tool *toolsdomain.ToolDefinition) ([]learningdomain.ScoredBelief, error) {
+	if s.beliefs == nil || tool == nil {
+		return nil, nil
+	}
+	terms := memorydomain.ExtractTerms(tool.Name+" "+tool.Category+" "+tool.Description, 20)
+	if len(terms) == 0 {
+		return nil, nil
+	}
+	found, err := s.beliefs.SearchBeliefs(ctx, userID, terms, 10)
+	if err != nil {
+		return nil, err
+	}
+	now := s.now()
+	result := make([]learningdomain.ScoredBelief, 0, len(found))
+	for _, belief := range found {
+		result = append(result, learningdomain.ScoredBelief{
+			ID:          belief.ID,
+			Confidence:  belief.DecayedConfidence(now),
+			Contradicts: belief.ContradictionCount > belief.EvidenceCount,
+		})
+	}
+	return result, nil
+}
+
+func (s *Service) hasExecutor(toolName string) bool {
+	if s.executors == nil {
+		return false
+	}
+	_, ok := s.executors.executors[toolName]
+	return ok
+}
+
 func (s *Service) getEnabledTool(ctx context.Context, name string) (*toolsdomain.ToolDefinition, error) {
 	tool, err := s.tools.GetTool(ctx, name)
 	if err != nil {
@@ -248,7 +523,7 @@ func (s *Service) ensureAutonomy(userID string, tool *toolsdomain.ToolDefinition
 func (s *Service) registerDefaultExecutors() {
 	s.executors.Register(toolsdomain.ToolCreateActivity, ToolExecutorFunc(func(ctx context.Context, userID string, proposal *actionsdomain.AIActionProposal) (json.RawMessage, error) {
 		var input createActivityInput
-		if err := json.Unmarshal(proposal.ProposedInput, &input); err != nil {
+		if err := json.Unmarshal(proposal.ExecutionInput(), &input); err != nil {
 			return nil, err
 		}
 		activity, err := s.activities.CreateActivity(ctx, userID, input.toDomain())
@@ -259,7 +534,7 @@ func (s *Service) registerDefaultExecutors() {
 	}))
 	s.executors.Register(toolsdomain.ToolCreateReminder, ToolExecutorFunc(func(ctx context.Context, userID string, proposal *actionsdomain.AIActionProposal) (json.RawMessage, error) {
 		var input createReminderInput
-		if err := json.Unmarshal(proposal.ProposedInput, &input); err != nil {
+		if err := json.Unmarshal(proposal.ExecutionInput(), &input); err != nil {
 			return nil, err
 		}
 		reminderInput, err := input.toDomain()
@@ -274,7 +549,7 @@ func (s *Service) registerDefaultExecutors() {
 	}))
 	s.executors.Register(toolsdomain.ToolCreateMemory, ToolExecutorFunc(func(ctx context.Context, userID string, proposal *actionsdomain.AIActionProposal) (json.RawMessage, error) {
 		var input createMemoryInput
-		if err := json.Unmarshal(proposal.ProposedInput, &input); err != nil {
+		if err := json.Unmarshal(proposal.ExecutionInput(), &input); err != nil {
 			return nil, err
 		}
 		memory, err := s.memories.CreateMemory(ctx, userID, input.toDomain())

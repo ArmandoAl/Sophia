@@ -18,8 +18,15 @@ func NewFakeModelClient() *FakeModelClient {
 }
 
 func (c *FakeModelClient) Generate(_ context.Context, request domain.ModelRequest) (domain.ModelResponse, error) {
+	if request.Task == domain.TaskSynthesize {
+		return domain.ModelResponse{
+			AssistantMessage: `{"reinforced":[],"contradicted":[],"novel":[]}`,
+			Usage:            domain.Usage{Model: "fake"},
+		}, nil
+	}
 	response := domain.ModelResponse{
 		AssistantMessage: "AI Runtime is ready, but no model provider is configured yet.",
+		Usage:            domain.Usage{Model: "fake"},
 	}
 
 	message := strings.ToLower(request.Message)

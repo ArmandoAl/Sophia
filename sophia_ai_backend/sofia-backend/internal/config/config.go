@@ -10,6 +10,8 @@ import (
 )
 
 const (
+	DefaultContextTokenBudget = 4600
+
 	defaultEnv               = "development"
 	defaultPort              = "8080"
 	defaultJWTSecret         = "development-insecure-jwt-secret"
@@ -29,6 +31,10 @@ const (
 	defaultReminderBatchSize = 50
 	defaultReminderProvider  = "noop"
 	defaultReminderLease     = 2 * time.Minute
+	defaultSynthesisInterval = time.Minute
+	defaultSynthesisLease    = 2 * time.Minute
+	defaultSynthesisRunHour  = 3
+	defaultAutonomyThreshold = 0.85
 )
 
 type Config struct {
@@ -50,6 +56,7 @@ type Config struct {
 	IdleTimeout              time.Duration
 	ReadHeaderTimeout        time.Duration
 	AIModelProvider          string
+	ContextTokenBudget       int
 	GeminiAPIKey             string
 	GeminiModel              string
 	DeepSeekAPIKey           string
@@ -66,6 +73,12 @@ type Config struct {
 	FCMEnabled               bool
 	FCMDryRun                bool
 	FCMProjectID             string
+	SynthesisWorkerEnabled   bool
+	SynthesisWorkerID        string
+	SynthesisWorkerInterval  time.Duration
+	SynthesisWorkerLease     time.Duration
+	SynthesisRunHourLocal    int
+	AutonomyThreshold        float64
 }
 
 func Load() (Config, error) {
@@ -88,6 +101,7 @@ func Load() (Config, error) {
 		IdleTimeout:              defaultIdleTimeout,
 		ReadHeaderTimeout:        defaultReadHeaderTimeout,
 		AIModelProvider:          strings.ToLower(getEnv("AI_MODEL_PROVIDER", defaultAIModelProvider)),
+		ContextTokenBudget:       DefaultContextTokenBudget,
 		GeminiAPIKey:             strings.TrimSpace(os.Getenv("GEMINI_API_KEY")),
 		GeminiModel:              getEnv("GEMINI_MODEL", defaultGeminiModel),
 		DeepSeekAPIKey:           strings.TrimSpace(os.Getenv("DEEPSEEK_API_KEY")),
@@ -104,6 +118,12 @@ func Load() (Config, error) {
 		FCMEnabled:               boolEnv("FCM_ENABLED", false),
 		FCMDryRun:                boolEnv("FCM_DRY_RUN", true),
 		FCMProjectID:             strings.TrimSpace(os.Getenv("FCM_PROJECT_ID")),
+		SynthesisWorkerEnabled:   boolEnv("SYNTHESIS_WORKER_ENABLED", false),
+		SynthesisWorkerID:        getEnv("SYNTHESIS_WORKER_ID", defaultSynthesisWorkerID()),
+		SynthesisWorkerInterval:  defaultSynthesisInterval,
+		SynthesisWorkerLease:     defaultSynthesisLease,
+		SynthesisRunHourLocal:    defaultSynthesisRunHour,
+		AutonomyThreshold:        defaultAutonomyThreshold,
 	}
 
 	if !isValidEnv(cfg.Env) {
@@ -185,6 +205,9 @@ func Load() (Config, error) {
 	if cfg.ReadHeaderTimeout, err = durationEnv("HTTP_READ_HEADER_TIMEOUT", cfg.ReadHeaderTimeout); err != nil {
 		return Config{}, err
 	}
+	if cfg.ContextTokenBudget, err = intEnv("CONTEXT_TOKEN_BUDGET", cfg.ContextTokenBudget); err != nil {
+		return Config{}, err
+	}
 	if cfg.ReminderWorkerInterval, err = durationEnv("REMINDER_WORKER_INTERVAL", cfg.ReminderWorkerInterval); err != nil {
 		return Config{}, err
 	}
@@ -192,6 +215,18 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if cfg.ReminderWorkerLease, err = durationEnv("REMINDER_WORKER_LEASE_DURATION", cfg.ReminderWorkerLease); err != nil {
+		return Config{}, err
+	}
+	if cfg.SynthesisWorkerInterval, err = durationEnv("SYNTHESIS_WORKER_INTERVAL", cfg.SynthesisWorkerInterval); err != nil {
+		return Config{}, err
+	}
+	if cfg.SynthesisWorkerLease, err = durationEnv("SYNTHESIS_WORKER_LEASE", cfg.SynthesisWorkerLease); err != nil {
+		return Config{}, err
+	}
+	if cfg.SynthesisRunHourLocal, err = hourEnv("SYNTHESIS_RUN_HOUR_LOCAL", cfg.SynthesisRunHourLocal); err != nil {
+		return Config{}, err
+	}
+	if cfg.AutonomyThreshold, err = ratioEnv("AUTONOMY_THRESHOLD", cfg.AutonomyThreshold); err != nil {
 		return Config{}, err
 	}
 
@@ -216,6 +251,26 @@ func defaultReminderWorkerID() string {
 		return "reminder-worker-local"
 	}
 	return "reminder-worker-" + strings.TrimSpace(hostname)
+}
+
+func defaultSynthesisWorkerID() string {
+	hostname, err := os.Hostname()
+	if err != nil || strings.TrimSpace(hostname) == "" {
+		return "synthesis-worker-local"
+	}
+	return "synthesis-worker-" + strings.TrimSpace(hostname)
+}
+
+func hourEnv(key string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed < 0 || parsed > 23 {
+		return 0, fmt.Errorf("%s must be an hour between 0 and 23", key)
+	}
+	return parsed, nil
 }
 
 func splitCSV(value string) []string {
@@ -269,6 +324,18 @@ func durationEnv(key string, fallback time.Duration) (time.Duration, error) {
 		return 0, fmt.Errorf("%s must be a positive duration", key)
 	}
 	return duration, nil
+}
+
+func ratioEnv(key string, fallback float64) (float64, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || parsed < 0 || parsed > 1 {
+		return 0, fmt.Errorf("%s must be a number between 0 and 1", key)
+	}
+	return parsed, nil
 }
 
 func intEnv(key string, fallback int) (int, error) {

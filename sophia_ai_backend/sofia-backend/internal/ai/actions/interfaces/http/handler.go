@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -25,6 +26,16 @@ type createProposalRequest struct {
 	Reason        string          `json:"reason"`
 	RiskLevel     string          `json:"risk_level"`
 	ExpiresAt     string          `json:"expires_at"`
+}
+
+type confirmProposalRequest struct {
+	CorrectedInput    json.RawMessage `json:"corrected_input"`
+	DecisionLatencyMS *int64          `json:"decision_latency_ms"`
+}
+
+type rejectProposalRequest struct {
+	RejectionReason   string `json:"rejection_reason"`
+	DecisionLatencyMS *int64 `json:"decision_latency_ms"`
 }
 
 func NewHandler(service *application.Service, requestLimit int64) *Handler {
@@ -87,6 +98,19 @@ func (h *Handler) Resource(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if action == "explanation" {
+		if r.Method != http.MethodGet {
+			httpjson.MethodNotAllowed(w)
+			return
+		}
+		explanation, err := h.service.ExplainActionProposal(r.Context(), userID, id)
+		if err != nil {
+			h.handleError(w, err)
+			return
+		}
+		httpjson.WriteJSON(w, http.StatusOK, explanation)
+		return
+	}
 	if action != "" {
 		h.action(w, r, userID, id, action)
 		return
@@ -114,9 +138,19 @@ func (h *Handler) action(w http.ResponseWriter, r *http.Request, userID, id, act
 	)
 	switch action {
 	case "confirm":
-		proposal, err = h.service.ConfirmActionProposal(r.Context(), userID, id)
+		var req confirmProposalRequest
+		if err = decodeOptionalJSON(r, &req, h.requestLimit); err != nil {
+			httpjson.BadRequest(w, "invalid request body")
+			return
+		}
+		proposal, err = h.service.ConfirmActionProposal(r.Context(), userID, id, req.CorrectedInput, req.DecisionLatencyMS)
 	case "reject":
-		proposal, err = h.service.RejectActionProposal(r.Context(), userID, id)
+		var req rejectProposalRequest
+		if err = decodeOptionalJSON(r, &req, h.requestLimit); err != nil {
+			httpjson.BadRequest(w, "invalid request body")
+			return
+		}
+		proposal, err = h.service.RejectActionProposal(r.Context(), userID, id, req.RejectionReason, req.DecisionLatencyMS)
 	case "execute":
 		proposal, err = h.service.ExecuteConfirmedActionProposal(r.Context(), userID, id)
 	default:
@@ -140,6 +174,22 @@ func (r createProposalRequest) toDomain() (actionsdomain.ProposalCreate, error) 
 		expiresAt = &parsed
 	}
 	return actionsdomain.ProposalCreate{ToolName: r.ToolName, ProposedInput: r.ProposedInput, Reason: r.Reason, RiskLevel: r.RiskLevel, ExpiresAt: expiresAt}, nil
+}
+
+func decodeOptionalJSON(r *http.Request, dst any, limitBytes int64) error {
+	if r.Body == nil {
+		return nil
+	}
+	r.Body = http.MaxBytesReader(nil, r.Body, limitBytes)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(dst); err != nil {
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 func authenticatedUserID(r *http.Request) (string, bool) {
