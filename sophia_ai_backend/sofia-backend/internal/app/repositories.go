@@ -15,6 +15,8 @@ import (
 	conversationsdomain "github.com/armandoalvarado/sofia-backend/internal/conversations/domain"
 	conversationsinfra "github.com/armandoalvarado/sofia-backend/internal/conversations/infrastructure"
 	"github.com/armandoalvarado/sofia-backend/internal/database"
+	ingestiondomain "github.com/armandoalvarado/sofia-backend/internal/ingestion/domain"
+	ingestioninfra "github.com/armandoalvarado/sofia-backend/internal/ingestion/infrastructure"
 	insightsdomain "github.com/armandoalvarado/sofia-backend/internal/insights/domain"
 	insightsinfra "github.com/armandoalvarado/sofia-backend/internal/insights/infrastructure"
 	learningdomain "github.com/armandoalvarado/sofia-backend/internal/learning/domain"
@@ -34,53 +36,57 @@ import (
 )
 
 type Repositories struct {
-	Users           authdomain.UserRepository
-	Profiles        usersdomain.UserProfileRepository
-	AISettings      usersdomain.AISettingsRepository
-	Activities      activitiesdomain.ActivityRepository
-	Reminders       remindersdomain.ReminderRepository
-	Moods           insightsdomain.MoodEntryRepository
-	Outcomes        insightsdomain.ActivityOutcomeRepository
-	Reflections     insightsdomain.ReflectionRepository
-	Memories        memorydomain.MemoryRepository
-	Beliefs         learningdomain.BeliefRepository
-	PromptVersions  learningdomain.PromptVersionRepository
-	DailySummaries  learningdomain.DailySummaryRepository
-	DeviceTokens    notificationsdomain.DeviceTokenRepository
-	Tools           toolsdomain.ToolDefinitionRepository
-	ActionProposals actionsdomain.AIActionProposalRepository
-	Conversations   conversationsdomain.ConversationRepository
-	Messages        conversationsdomain.ConversationMessageRepository
-	AuditLogs       privacydomain.AuditLogRepository
-	DeleteRequests  privacydomain.DeleteRequestRepository
-	FirestoreStatus string
-	Close           func()
+	Users            authdomain.UserRepository
+	Profiles         usersdomain.UserProfileRepository
+	AISettings       usersdomain.AISettingsRepository
+	Activities       activitiesdomain.ActivityRepository
+	Reminders        remindersdomain.ReminderRepository
+	Moods            insightsdomain.MoodEntryRepository
+	Outcomes         insightsdomain.ActivityOutcomeRepository
+	Reflections      insightsdomain.ReflectionRepository
+	Memories         memorydomain.MemoryRepository
+	Beliefs          learningdomain.BeliefRepository
+	PromptVersions   learningdomain.PromptVersionRepository
+	DailySummaries   learningdomain.DailySummaryRepository
+	UserContexts     learningdomain.UserContextRepository
+	IngestionBatches ingestiondomain.BatchRepository
+	DeviceTokens     notificationsdomain.DeviceTokenRepository
+	Tools            toolsdomain.ToolDefinitionRepository
+	ActionProposals  actionsdomain.AIActionProposalRepository
+	Conversations    conversationsdomain.ConversationRepository
+	Messages         conversationsdomain.ConversationMessageRepository
+	AuditLogs        privacydomain.AuditLogRepository
+	DeleteRequests   privacydomain.DeleteRequestRepository
+	FirestoreStatus  string
+	Close            func()
 }
 
 func BuildRepositories(cfg config.Config) (*Repositories, error) {
 	if cfg.PersistenceDriver != "firestore" {
 		return &Repositories{
-			Users:           authinfra.NewInMemoryUserRepository(),
-			Profiles:        usersinfra.NewInMemoryUserProfileRepository(),
-			AISettings:      usersinfra.NewInMemoryAISettingsRepository(),
-			Activities:      activitiesinfra.NewInMemoryActivityRepository(),
-			Reminders:       remindersinfra.NewInMemoryReminderRepository(),
-			Moods:           insightsinfra.NewInMemoryMoodEntryRepository(),
-			Outcomes:        insightsinfra.NewInMemoryActivityOutcomeRepository(),
-			Reflections:     insightsinfra.NewInMemoryReflectionRepository(),
-			Memories:        memoryinfra.NewInMemoryMemoryRepository(),
-			Beliefs:         learninginfra.NewInMemoryBeliefRepository(),
-			PromptVersions:  learninginfra.NewInMemoryPromptVersionRepository(),
-			DailySummaries:  learninginfra.NewInMemoryDailySummaryRepository(),
-			DeviceTokens:    notificationsinfra.NewInMemoryDeviceTokenRepository(),
-			Tools:           toolsinfra.NewInMemoryToolDefinitionRepository(),
-			ActionProposals: actionsinfra.NewInMemoryAIActionProposalRepository(),
-			Conversations:   conversationsinfra.NewInMemoryConversationRepository(),
-			Messages:        conversationsinfra.NewInMemoryConversationMessageRepository(),
-			AuditLogs:       privacyinfra.NewInMemoryAuditLogRepository(),
-			DeleteRequests:  privacyinfra.NewInMemoryDeleteRequestRepository(),
-			FirestoreStatus: "disabled",
-			Close:           func() {},
+			Users:            authinfra.NewInMemoryUserRepository(),
+			Profiles:         usersinfra.NewInMemoryUserProfileRepository(),
+			AISettings:       usersinfra.NewInMemoryAISettingsRepository(),
+			Activities:       activitiesinfra.NewInMemoryActivityRepository(),
+			Reminders:        remindersinfra.NewInMemoryReminderRepository(),
+			Moods:            insightsinfra.NewInMemoryMoodEntryRepository(),
+			Outcomes:         insightsinfra.NewInMemoryActivityOutcomeRepository(),
+			Reflections:      insightsinfra.NewInMemoryReflectionRepository(),
+			Memories:         memoryinfra.NewInMemoryMemoryRepository(),
+			Beliefs:          learninginfra.NewInMemoryBeliefRepository(),
+			PromptVersions:   learninginfra.NewInMemoryPromptVersionRepository(),
+			DailySummaries:   learninginfra.NewInMemoryDailySummaryRepository(),
+			UserContexts:     learninginfra.NewInMemoryUserContextRepository(),
+			IngestionBatches: ingestioninfra.NewInMemoryBatchRepository(),
+			DeviceTokens:     notificationsinfra.NewInMemoryDeviceTokenRepository(),
+			Tools:            toolsinfra.NewInMemoryToolDefinitionRepository(),
+			ActionProposals:  actionsinfra.NewInMemoryAIActionProposalRepository(),
+			Conversations:    conversationsinfra.NewInMemoryConversationRepository(),
+			Messages:         conversationsinfra.NewInMemoryConversationMessageRepository(),
+			AuditLogs:        privacyinfra.NewInMemoryAuditLogRepository(),
+			DeleteRequests:   privacyinfra.NewInMemoryDeleteRequestRepository(),
+			FirestoreStatus:  "disabled",
+			Close:            func() {},
 		}, nil
 	}
 
@@ -91,26 +97,28 @@ func BuildRepositories(cfg config.Config) (*Repositories, error) {
 	log.Printf("firestore bootstrap ok project_id=%s emulator_enabled=%t", cfg.FirestoreProjectID, cfg.FirestoreEmulatorHost != "")
 
 	return &Repositories{
-		Users:           authinfra.NewFirestoreUserRepository(store.Client),
-		Profiles:        usersinfra.NewFirestoreUserProfileRepository(store.Client),
-		AISettings:      usersinfra.NewFirestoreAISettingsRepository(store.Client),
-		Activities:      activitiesinfra.NewFirestoreActivityRepository(store.Client),
-		Reminders:       remindersinfra.NewFirestoreReminderRepository(store.Client),
-		Moods:           insightsinfra.NewFirestoreMoodEntryRepository(store.Client),
-		Outcomes:        insightsinfra.NewFirestoreActivityOutcomeRepository(store.Client),
-		Reflections:     insightsinfra.NewFirestoreReflectionRepository(store.Client),
-		Memories:        memoryinfra.NewFirestoreMemoryRepository(store.Client),
-		Beliefs:         learninginfra.NewFirestoreBeliefRepository(store.Client),
-		PromptVersions:  learninginfra.NewFirestorePromptVersionRepository(store.Client),
-		DailySummaries:  learninginfra.NewFirestoreDailySummaryRepository(store.Client),
-		DeviceTokens:    notificationsinfra.NewFirestoreDeviceTokenRepository(store.Client),
-		Tools:           toolsinfra.NewFirestoreToolDefinitionRepository(store.Client),
-		ActionProposals: actionsinfra.NewFirestoreAIActionProposalRepository(store.Client),
-		Conversations:   conversationsinfra.NewFirestoreConversationRepository(store.Client),
-		Messages:        conversationsinfra.NewFirestoreConversationMessageRepository(store.Client),
-		AuditLogs:       privacyinfra.NewFirestoreAuditLogRepository(store.Client),
-		DeleteRequests:  privacyinfra.NewFirestoreDeleteRequestRepository(store.Client),
-		FirestoreStatus: "ok",
+		Users:            authinfra.NewFirestoreUserRepository(store.Client),
+		Profiles:         usersinfra.NewFirestoreUserProfileRepository(store.Client),
+		AISettings:       usersinfra.NewFirestoreAISettingsRepository(store.Client),
+		Activities:       activitiesinfra.NewFirestoreActivityRepository(store.Client),
+		Reminders:        remindersinfra.NewFirestoreReminderRepository(store.Client),
+		Moods:            insightsinfra.NewFirestoreMoodEntryRepository(store.Client),
+		Outcomes:         insightsinfra.NewFirestoreActivityOutcomeRepository(store.Client),
+		Reflections:      insightsinfra.NewFirestoreReflectionRepository(store.Client),
+		Memories:         memoryinfra.NewFirestoreMemoryRepository(store.Client),
+		Beliefs:          learninginfra.NewFirestoreBeliefRepository(store.Client),
+		PromptVersions:   learninginfra.NewFirestorePromptVersionRepository(store.Client),
+		DailySummaries:   learninginfra.NewFirestoreDailySummaryRepository(store.Client),
+		UserContexts:     learninginfra.NewFirestoreUserContextRepository(store.Client),
+		IngestionBatches: ingestioninfra.NewFirestoreBatchRepository(store.Client),
+		DeviceTokens:     notificationsinfra.NewFirestoreDeviceTokenRepository(store.Client),
+		Tools:            toolsinfra.NewFirestoreToolDefinitionRepository(store.Client),
+		ActionProposals:  actionsinfra.NewFirestoreAIActionProposalRepository(store.Client),
+		Conversations:    conversationsinfra.NewFirestoreConversationRepository(store.Client),
+		Messages:         conversationsinfra.NewFirestoreConversationMessageRepository(store.Client),
+		AuditLogs:        privacyinfra.NewFirestoreAuditLogRepository(store.Client),
+		DeleteRequests:   privacyinfra.NewFirestoreDeleteRequestRepository(store.Client),
+		FirestoreStatus:  "ok",
 		Close: func() {
 			if err := store.Close(); err != nil {
 				log.Printf("firestore close failed: %v", err)

@@ -48,7 +48,7 @@ func TestBuildModelClientSupportsDeepSeek(t *testing.T) {
 		AIModelProvider:  "deepseek",
 		AIRuntimeEnabled: true,
 		DeepSeekAPIKey:   "test-key",
-		DeepSeekModel:    "deepseek-test",
+		DeepSeekModels:   map[string]string{"": "deepseek-test"},
 		DeepSeekBaseURL:  "https://deepseek.test",
 	})
 	if err != nil {

@@ -15,8 +15,9 @@ type Handler struct {
 }
 
 type messageRequest struct {
-	Message string `json:"message"`
-	DryRun  bool   `json:"dry_run"`
+	Message       string `json:"message"`
+	DryRun        bool   `json:"dry_run"`
+	ActiveContext string `json:"active_context"`
 }
 
 func NewHandler(runtime domain.RuntimeService, requestLimit int64) *Handler {
@@ -41,9 +42,10 @@ func (h *Handler) Message(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response, err := h.runtime.HandleMessage(r.Context(), domain.RuntimeRequest{
-		UserID:  claims.UserID,
-		Message: request.Message,
-		DryRun:  request.DryRun,
+		UserID:        claims.UserID,
+		Message:       request.Message,
+		DryRun:        request.DryRun,
+		ActiveContext: request.ActiveContext,
 	})
 	if err != nil {
 		switch {

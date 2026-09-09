@@ -3,6 +3,7 @@ package worker
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"strings"
 	"sync"
@@ -166,12 +167,114 @@ func TestRunDailySameDayIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestRunDailyUnknownNovelScopeFallsBackToGlobal(t *testing.T) {
+	env := newWorkerTestEnv(t)
+	ctx := context.Background()
+	day := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	env.mustProposal(t, "create_activity", actionsdomain.FeedbackApprovedDirect, day)
+	env.model.body = marshalSynthesis(t, synthesisOutput{Novel: []novelBelief{{
+		Statement: "Hablar con cercanía", Category: learningdomain.CategoryCommunication, Confidence: 0.7,
+		Scope: learningdomain.ScopePerson, ScopeKey: "person:unknown",
+	}}})
+	if err := env.worker.RunDaily(ctx, env.userID, day); err != nil {
+		t.Fatal(err)
+	}
+	beliefs, err := env.learning.ListActiveBeliefs(ctx, env.userID, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(beliefs) != 1 || beliefs[0].EffectiveScope() != learningdomain.ScopeGlobal || beliefs[0].ScopeKey != "" {
+		t.Fatalf("unknown context did not fall back to global: %+v", beliefs)
+	}
+}
+
+func TestRunDailyRecompileFailureDoesNotReapplyDelta(t *testing.T) {
+	env := newWorkerTestEnv(t)
+	ctx := context.Background()
+	day := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	belief, err := env.learning.UpsertBelief(ctx, env.userID, "Prefiere reuniones a las 9am", learningdomain.CategorySchedule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.mustProposal(t, "create_reminder", actionsdomain.FeedbackApprovedDirect, day)
+	env.model.body = marshalSynthesis(t, synthesisOutput{
+		Reinforced: []reinforcedBelief{{BeliefID: belief.ID, Evidence: "approved reminder", ConfidenceDelta: 0.1}},
+	})
+	env.learning = learningapp.NewService(env.beliefs, failingPromptVersionRepository{env.prompts}, env.summaries)
+	env.worker.deps.Learning = env.learning
+
+	if err := env.worker.RunDaily(ctx, env.userID, day); !errors.Is(err, errRecompile) {
+		t.Fatalf("expected recompile failure, got %v", err)
+	}
+	summary, err := env.learning.FindDailySummary(ctx, env.userID, "2026-09-06")
+	if err != nil {
+		t.Fatalf("reserved summary missing after recompile failure: %v", err)
+	}
+	if len(summary.DeltaVsPrevious.Reinforced) != 0 {
+		t.Fatal("failed run should leave the reserved summary incomplete")
+	}
+	if err := env.worker.RunDaily(ctx, env.userID, day); err != nil {
+		t.Fatal(err)
+	}
+	updated, err := env.learning.GetBelief(ctx, env.userID, belief.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.EvidenceCount != 2 {
+		t.Fatalf("EvidenceCount = %d, want 2", updated.EvidenceCount)
+	}
+	if env.model.callCount() != 1 {
+		t.Fatalf("expected a single model call, got %d", env.model.callCount())
+	}
+}
+
+func TestRunDailyConcurrentAppliesDeltaOnce(t *testing.T) {
+	env := newWorkerTestEnv(t)
+	ctx := context.Background()
+	day := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	belief, err := env.learning.UpsertBelief(ctx, env.userID, "Prefiere reuniones a las 9am", learningdomain.CategorySchedule)
+	if err != nil {
+		t.Fatal(err)
+	}
+	env.mustProposal(t, "create_reminder", actionsdomain.FeedbackApprovedDirect, day)
+	env.model.body = marshalSynthesis(t, synthesisOutput{
+		Reinforced: []reinforcedBelief{{BeliefID: belief.ID, Evidence: "approved reminder", ConfidenceDelta: 0.1}},
+	})
+	var ready sync.WaitGroup
+	ready.Add(2)
+	release := make(chan struct{})
+	env.model.ready = &ready
+	env.model.release = release
+	other := New(env.worker.deps, env.worker.options)
+
+	errs := make(chan error, 2)
+	go func() { errs <- env.worker.RunDaily(ctx, env.userID, day) }()
+	go func() { errs <- other.RunDaily(ctx, env.userID, day) }()
+	ready.Wait()
+	close(release)
+	for range 2 {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
+	}
+	updated, err := env.learning.GetBelief(ctx, env.userID, belief.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if updated.EvidenceCount != 2 {
+		t.Fatalf("EvidenceCount = %d, want 2", updated.EvidenceCount)
+	}
+}
+
 type workerTestEnv struct {
 	userID    string
 	worker    *Worker
 	learning  *learningapp.Service
 	model     *scriptedModelClient
 	proposals *actionsinfra.InMemoryAIActionProposalRepository
+	beliefs   *learninginfra.InMemoryBeliefRepository
+	prompts   *learninginfra.InMemoryPromptVersionRepository
+	summaries *learninginfra.InMemoryDailySummaryRepository
 }
 
 func newWorkerTestEnv(t *testing.T) *workerTestEnv {
@@ -192,11 +295,11 @@ func newWorkerTestEnv(t *testing.T) *workerTestEnv {
 		t.Fatal(err)
 	}
 
-	learning := learningapp.NewService(
-		learninginfra.NewInMemoryBeliefRepository(),
-		learninginfra.NewInMemoryPromptVersionRepository(),
-		learninginfra.NewInMemoryDailySummaryRepository(),
-	)
+	beliefs := learninginfra.NewInMemoryBeliefRepository()
+	prompts := learninginfra.NewInMemoryPromptVersionRepository()
+	summaries := learninginfra.NewInMemoryDailySummaryRepository()
+	learning := learningapp.NewService(beliefs, prompts, summaries)
+	learning.SetContextRepository(learninginfra.NewInMemoryUserContextRepository())
 	proposals := actionsinfra.NewInMemoryAIActionProposalRepository()
 	model := &scriptedModelClient{body: `{"reinforced":[],"contradicted":[],"novel":[]}`, usage: runtimedomain.Usage{InputTokens: 12, OutputTokens: 8, Model: "fake"}}
 	audit := privacyinfra.NewInMemoryAuditLogRepository()
@@ -208,7 +311,10 @@ func newWorkerTestEnv(t *testing.T) *workerTestEnv {
 		Model:     model,
 		Audit:     auditAdapter{repo: audit},
 	}, Options{WorkerID: "test-synth", Now: func() time.Time { return time.Date(2026, 9, 7, 3, 0, 0, 0, time.UTC) }})
-	return &workerTestEnv{userID: user.ID, worker: runner, learning: learning, model: model, proposals: proposals}
+	return &workerTestEnv{
+		userID: user.ID, worker: runner, learning: learning, model: model, proposals: proposals,
+		beliefs: beliefs, prompts: prompts, summaries: summaries,
+	}
 }
 
 func (env *workerTestEnv) mustProposal(t *testing.T, tool, feedback string, day time.Time) {
@@ -243,17 +349,26 @@ func (env *workerTestEnv) mustProposal(t *testing.T, tool, feedback string, day 
 }
 
 type scriptedModelClient struct {
-	mu    sync.Mutex
-	calls []runtimedomain.ModelRequest
-	body  string
-	usage runtimedomain.Usage
+	mu      sync.Mutex
+	calls   []runtimedomain.ModelRequest
+	body    string
+	usage   runtimedomain.Usage
+	ready   *sync.WaitGroup
+	release <-chan struct{}
 }
 
 func (c *scriptedModelClient) Generate(_ context.Context, request runtimedomain.ModelRequest) (runtimedomain.ModelResponse, error) {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	c.calls = append(c.calls, request)
-	return runtimedomain.ModelResponse{AssistantMessage: c.body, Usage: c.usage}, nil
+	body, usage, ready, release := c.body, c.usage, c.ready, c.release
+	c.mu.Unlock()
+	if ready != nil {
+		ready.Done()
+	}
+	if release != nil {
+		<-release
+	}
+	return runtimedomain.ModelResponse{AssistantMessage: body, Usage: usage}, nil
 }
 
 func (c *scriptedModelClient) callCount() int {
@@ -266,6 +381,16 @@ func (c *scriptedModelClient) lastRequest() runtimedomain.ModelRequest {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return c.calls[len(c.calls)-1]
+}
+
+var errRecompile = errors.New("recompile failed")
+
+type failingPromptVersionRepository struct {
+	learningdomain.PromptVersionRepository
+}
+
+func (failingPromptVersionRepository) CreateActive(context.Context, *learningdomain.PromptVersion) error {
+	return errRecompile
 }
 
 func marshalSynthesis(t *testing.T, output synthesisOutput) string {

@@ -66,8 +66,9 @@ func BuildPromptSuffix(request ModelRequest) ([]byte, error) {
 	return json.Marshal(struct {
 		ConversationHistory []Turn         `json:"conversation_history"`
 		ContextSummary      ContextSummary `json:"context_summary"`
+		ActiveContext       *ActiveContext `json:"active_context,omitempty"`
 		UserMessage         string         `json:"user_message"`
-	}{history, request.Context, truncatePromptText(request.Message, 1000)})
+	}{history, request.Context, request.Context.ActiveContext, truncatePromptText(request.Message, 1000)})
 }
 
 func truncatePromptText(value string, limit int) string {

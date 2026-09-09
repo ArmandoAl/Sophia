@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	activitiesdomain "github.com/armandoalvarado/sofia-backend/internal/activities/domain"
 	actionsapp "github.com/armandoalvarado/sofia-backend/internal/ai/actions/application"
@@ -76,6 +77,12 @@ type PromptBaseReader interface {
 	ActivePromptContent(ctx context.Context, userID string) (string, error)
 }
 
+type LearningContextReader interface {
+	ListUserContexts(ctx context.Context, userID string) ([]*learningdomain.UserContext, error)
+	FindUserContextByScopeKey(ctx context.Context, userID, scopeKey string) (*learningdomain.UserContext, error)
+	ContextBeliefStatements(ctx context.Context, userID, scopeKey string) ([]string, error)
+}
+
 type ContextBuilder struct {
 	users      UserReader
 	activities ActivityLister
@@ -83,6 +90,7 @@ type ContextBuilder struct {
 	insights   InsightsSummarizer
 	memories   MemorySearcher
 	prompts    PromptBaseReader
+	contexts   LearningContextReader
 	limit      int
 	tokenLimit int
 }
@@ -98,7 +106,15 @@ func (b *ContextBuilder) SetPromptBaseReader(reader PromptBaseReader) {
 	b.prompts = reader
 }
 
-func (b *ContextBuilder) Build(ctx context.Context, userID, message string) (domain.ContextSummary, error) {
+func (b *ContextBuilder) SetLearningContextReader(reader LearningContextReader) {
+	b.contexts = reader
+}
+
+func (b *ContextBuilder) Build(ctx context.Context, userID, message string, activeContexts ...string) (domain.ContextSummary, error) {
+	activeContext := ""
+	if len(activeContexts) > 0 {
+		activeContext = activeContexts[0]
+	}
 	me, err := b.users.GetMe(userID)
 	if err != nil {
 		return domain.ContextSummary{}, err
@@ -146,6 +162,17 @@ func (b *ContextBuilder) Build(ctx context.Context, userID, message string) (dom
 	activities, err := b.activities.ListActivities(ctx, activitiesdomain.ListFilter{UserID: userID, Limit: b.limit})
 	if err != nil {
 		return domain.ContextSummary{}, err
+	}
+	contextValue, err := b.resolveActiveContext(ctx, userID, activeContext)
+	if err != nil {
+		return domain.ContextSummary{}, err
+	}
+	if contextValue != nil {
+		beliefs, err := b.contexts.ContextBeliefStatements(ctx, userID, contextValue.ScopeKey())
+		if err != nil {
+			return domain.ContextSummary{}, err
+		}
+		summary.ActiveContext = &domain.ActiveContext{ScopeKey: contextValue.ScopeKey(), Label: contextValue.Label, Beliefs: beliefs}
 	}
 
 	var due []*remindersdomain.Reminder
@@ -208,6 +235,49 @@ func (b *ContextBuilder) Build(ctx context.Context, userID, message string) (dom
 	}
 
 	return summary, nil
+}
+
+func (b *ContextBuilder) resolveActiveContext(ctx context.Context, userID, explicit string) (*learningdomain.UserContext, error) {
+	if b.contexts == nil {
+		return nil, nil
+	}
+	if strings.TrimSpace(explicit) != "" {
+		return b.contexts.FindUserContextByScopeKey(ctx, userID, explicit)
+	}
+	contexts, err := b.contexts.ListUserContexts(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	activities, err := b.activities.ListActivities(ctx, activitiesdomain.ListFilter{UserID: userID, Status: activitiesdomain.StatusActive, Limit: b.limit})
+	if err != nil {
+		return nil, err
+	}
+	for _, activity := range activities {
+		for _, contextValue := range contexts {
+			if contextValue != nil && contextValue.Active && activityMentionsContext(activity, contextValue) {
+				return contextValue, nil
+			}
+		}
+	}
+	// Model-inferred context is intentionally deferred until it can be resolved safely.
+	return nil, nil
+}
+
+func activityMentionsContext(activity *activitiesdomain.Activity, contextValue *learningdomain.UserContext) bool {
+	values := append([]string{contextValue.Slug}, contextValue.Aliases...)
+	haystack := normalizeMention(strings.Join(append([]string{activity.Title}, activity.Tags...), " "))
+	for _, value := range values {
+		if strings.Contains(" "+haystack+" ", " "+normalizeMention(value)+" ") {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeMention(value string) string {
+	return strings.Join(strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
+	}), " ")
 }
 
 type ToolSelector struct {
@@ -327,7 +397,7 @@ func (s *RuntimeService) HandleMessage(ctx context.Context, request domain.Runti
 		return nil, domain.ErrInvalidMessage
 	}
 
-	contextSummary, err := s.contextBuilder.Build(ctx, request.UserID, request.Message)
+	contextSummary, err := s.contextBuilder.Build(ctx, request.UserID, request.Message, request.ActiveContext)
 	if err != nil {
 		return nil, err
 	}
@@ -359,6 +429,7 @@ func (s *RuntimeService) HandleMessage(ctx context.Context, request domain.Runti
 		Tools:      tools,
 		History:    history,
 		PromptBase: contextSummary.PromptBase,
+		Task:       domain.TaskPlan,
 	})
 	providerLatency := time.Since(providerStarted)
 	if err != nil {

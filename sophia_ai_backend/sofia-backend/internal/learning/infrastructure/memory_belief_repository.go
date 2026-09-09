@@ -69,6 +69,25 @@ func (r *InMemoryBeliefRepository) ListActive(ctx context.Context, userID string
 	return result, nil
 }
 
+func (r *InMemoryBeliefRepository) ListActiveByScope(ctx context.Context, userID, scope, scopeKey string, limit int) ([]*domain.Belief, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := make([]*domain.Belief, 0)
+	for _, belief := range r.beliefs {
+		if belief.UserID != userID || belief.Status != domain.StatusActive || belief.EffectiveScope() != scope || belief.ScopeKey != scopeKey {
+			continue
+		}
+		result = append(result, cloneBelief(belief))
+	}
+	sort.SliceStable(result, func(i, j int) bool {
+		return result[i].Confidence > result[j].Confidence
+	})
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
+}
+
 func (r *InMemoryBeliefRepository) SearchByTerms(ctx context.Context, userID string, terms []string, limit int) ([]*domain.Belief, error) {
 	terms = memorydomain.CapSearchTerms(terms)
 	if len(terms) == 0 {
@@ -108,12 +127,29 @@ func (r *InMemoryBeliefRepository) SetPromptSlot(ctx context.Context, userID, be
 	return cp, nil
 }
 
+func (r *InMemoryBeliefRepository) RetireByBatchID(ctx context.Context, userID, batchID string) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	count := 0
+	for id, belief := range r.beliefs {
+		if belief.UserID != userID || belief.BatchID != batchID || belief.Status == domain.StatusRetired {
+			continue
+		}
+		cp := cloneBelief(belief)
+		cp.Status = domain.StatusRetired
+		r.beliefs[id] = cp
+		count++
+	}
+	return count, nil
+}
+
 func cloneBelief(belief *domain.Belief) *domain.Belief {
 	if belief == nil {
 		return nil
 	}
 	cp := *belief
 	cp.SearchTerms = cloneStrings(belief.SearchTerms)
+	cp.Embedding = cloneFloat32s(belief.Embedding)
 	cp.LastContradictedAt = cloneTime(belief.LastContradictedAt)
 	return &cp
 }

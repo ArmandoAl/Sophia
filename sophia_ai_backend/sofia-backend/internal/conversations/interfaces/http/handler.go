@@ -114,7 +114,7 @@ func (h *Handler) messages(w http.ResponseWriter, r *http.Request, userID, conve
 			httpjson.BadRequest(w, "invalid request body")
 			return
 		}
-		result, err := h.service.SendMessage(r.Context(), userID, conversationID, req.Content)
+		result, err := h.service.SendMessage(r.Context(), userID, conversationID, req.Content, req.ActiveContext)
 		if err != nil {
 			h.handleError(w, err)
 			return

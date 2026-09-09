@@ -23,14 +23,27 @@ func (r *InMemoryDailySummaryRepository) Create(ctx context.Context, summary *do
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, exists := r.summaries[summary.ID]; exists {
-		return domain.ErrDailySummaryExists
+		return domain.ErrDailySummaryAlreadyExists
 	}
 	for _, existing := range r.summaries {
 		if existing.UserID == summary.UserID && existing.Date == summary.Date {
-			return domain.ErrDailySummaryExists
+			return domain.ErrDailySummaryAlreadyExists
 		}
 	}
 	r.summaries[summary.ID] = cloneDailySummary(summary)
+	return nil
+}
+
+func (r *InMemoryDailySummaryRepository) Update(ctx context.Context, summary *domain.DailySummary) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	existing, ok := r.summaries[summary.ID]
+	if !ok {
+		return domain.ErrDailySummaryNotFound
+	}
+	existing.DeltaVsPrevious = cloneDailySummary(summary).DeltaVsPrevious
+	existing.PromptVersionBefore = summary.PromptVersionBefore
+	existing.PromptVersionAfter = summary.PromptVersionAfter
 	return nil
 }
 

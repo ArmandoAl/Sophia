@@ -14,11 +14,12 @@ import (
 
 	actionsdomain "github.com/armandoalvarado/sofia-backend/internal/ai/actions/domain"
 	runtimedomain "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/domain"
+	"github.com/armandoalvarado/sofia-backend/internal/config"
 	toolsdomain "github.com/armandoalvarado/sofia-backend/internal/tools/domain"
 )
 
 func TestNewClientRequiresAPIKey(t *testing.T) {
-	if _, err := NewClient("", "deepseek-test"); !errors.Is(err, ErrMissingAPIKey) {
+	if _, err := NewClient("", map[string]string{"": "deepseek-test"}); !errors.Is(err, ErrMissingAPIKey) {
 		t.Fatalf("expected ErrMissingAPIKey, got %v", err)
 	}
 }
@@ -54,7 +55,7 @@ func TestGenerateParsesStructuredOutput(t *testing.T) {
 		return jsonResponse(http.StatusOK, body), nil
 	})}
 
-	client, err := NewClient("test-key", "deepseek-test", WithEndpoint("https://deepseek.test/"), WithHTTPClient(clientHTTP))
+	client, err := NewClient("test-key", map[string]string{"": "deepseek-test"}, WithEndpoint("https://deepseek.test/"), WithHTTPClient(clientHTTP))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,36 +82,59 @@ func TestGenerateParsesStructuredOutput(t *testing.T) {
 	}
 }
 
-func TestGenerateSynthesisUsesDecisionsPromptAndUsage(t *testing.T) {
-	clientHTTP := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		var req deepSeekRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			t.Fatalf("decode request: %v", err)
-		}
-		if !strings.Contains(req.Messages[0].Content, "DECISIONS") || strings.Contains(req.Messages[1].Content, "conversation_history") {
-			t.Fatalf("synthesis prompt mixed in conversation: %+v", req.Messages)
-		}
-		output := `{"reinforced":[],"contradicted":[],"novel":[]}`
-		body, _ := json.Marshal(map[string]any{
-			"choices": []map[string]any{{"message": map[string]string{"content": output}}},
-			"usage":   map[string]any{"prompt_tokens": 18, "completion_tokens": 7, "prompt_cache_hit_tokens": 12},
+func TestGenerateSynthesisSelectsConfiguredModel(t *testing.T) {
+	tests := []struct {
+		name     string
+		override string
+		want     string
+	}{
+		{name: "override", override: "deepseek-synthesis", want: "deepseek-synthesis"},
+		{name: "fallback", want: "deepseek-default"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("ENV", "test")
+			t.Setenv("AI_MODEL_PROVIDER", "deepseek")
+			t.Setenv("DEEPSEEK_API_KEY", "test-key")
+			t.Setenv("DEEPSEEK_MODEL", "deepseek-default")
+			t.Setenv("DEEPSEEK_MODEL_SYNTHESIZE", tt.override)
+			cfg, err := config.Load()
+			if err != nil {
+				t.Fatal(err)
+			}
+			clientHTTP := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+				var req deepSeekRequest
+				if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+					t.Fatalf("decode request: %v", err)
+				}
+				if req.Model != tt.want {
+					t.Fatalf("model = %q, want %q", req.Model, tt.want)
+				}
+				if !strings.Contains(req.Messages[0].Content, "DECISIONS") || strings.Contains(req.Messages[1].Content, "conversation_history") {
+					t.Fatalf("synthesis prompt mixed in conversation: %+v", req.Messages)
+				}
+				output := `{"reinforced":[],"contradicted":[],"novel":[]}`
+				body, _ := json.Marshal(map[string]any{
+					"choices": []map[string]any{{"message": map[string]string{"content": output}}},
+					"usage":   map[string]any{"prompt_tokens": 18, "completion_tokens": 7, "prompt_cache_hit_tokens": 12},
+				})
+				return jsonResponse(http.StatusOK, body), nil
+			})}
+			client, err := NewClient(cfg.DeepSeekAPIKey, cfg.DeepSeekModels, WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
+			if err != nil {
+				t.Fatal(err)
+			}
+			response, err := client.Generate(context.Background(), runtimedomain.ModelRequest{
+				Message: `{"decisions":{"corrections":[]}}`,
+				Task:    runtimedomain.TaskSynthesize,
+			})
+			if err != nil {
+				t.Fatalf("Generate returned error: %v", err)
+			}
+			if response.Usage.InputTokens != 18 || response.Usage.OutputTokens != 7 || response.Usage.CachedInputTokens != 12 || response.Usage.Model != tt.want {
+				t.Fatalf("unexpected usage: %+v", response.Usage)
+			}
 		})
-		return jsonResponse(http.StatusOK, body), nil
-	})}
-
-	client, err := NewClient("test-key", "deepseek-test", WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
-	if err != nil {
-		t.Fatal(err)
-	}
-	response, err := client.Generate(context.Background(), runtimedomain.ModelRequest{
-		Message: `{"decisions":{"corrections":[]}}`,
-		Task:    runtimedomain.TaskSynthesize,
-	})
-	if err != nil {
-		t.Fatalf("Generate returned error: %v", err)
-	}
-	if response.Usage.InputTokens != 18 || response.Usage.OutputTokens != 7 || response.Usage.CachedInputTokens != 12 || response.Usage.Model != "deepseek-test" {
-		t.Fatalf("unexpected usage: %+v", response.Usage)
 	}
 }
 
@@ -126,7 +150,7 @@ func TestGenerateRejectsInvalidStructuredOutput(t *testing.T) {
 			})
 			return jsonResponse(http.StatusOK, body), nil
 		})}
-		client, err := NewClient("test-key", "deepseek-test", WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
+		client, err := NewClient("test-key", map[string]string{"": "deepseek-test"}, WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -137,12 +161,40 @@ func TestGenerateRejectsInvalidStructuredOutput(t *testing.T) {
 	}
 }
 
+func TestGenerateUsesExtractModelAndReportsIt(t *testing.T) {
+	clientHTTP := &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		var request deepSeekRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if request.Model != "deepseek-extract" {
+			t.Fatalf("model = %q, want deepseek-extract", request.Model)
+		}
+		body, _ := json.Marshal(map[string]any{
+			"choices": []map[string]any{{"message": map[string]string{"content": `{"beliefs":[]}`}}},
+			"usage":   map[string]any{"prompt_tokens": 4, "completion_tokens": 2},
+		})
+		return jsonResponse(http.StatusOK, body), nil
+	})}
+	client, err := NewClient("test-key", map[string]string{"": "deepseek-default", runtimedomain.TaskExtract: "deepseek-extract"}, WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := client.Generate(context.Background(), runtimedomain.ModelRequest{Message: `{}`, Task: runtimedomain.TaskExtract})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Usage.Model != "deepseek-extract" {
+		t.Fatalf("usage model = %q", response.Usage.Model)
+	}
+}
+
 func TestGenerateReturnsTypedRedactedHTTPError(t *testing.T) {
 	clientHTTP := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 		return jsonResponse(http.StatusForbidden, []byte(`{"error":{"message":"Permission denied for API key test-key","api_key":"test-key"}}`)), nil
 	})}
 
-	client, err := NewClient("test-key", "deepseek-test", WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
+	client, err := NewClient("test-key", map[string]string{"": "deepseek-test"}, WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +228,7 @@ func TestGenerateClassifiesHTTPErrors(t *testing.T) {
 			clientHTTP := &http.Client{Transport: roundTripFunc(func(*http.Request) (*http.Response, error) {
 				return jsonResponse(tt.statusCode, []byte(tt.body)), nil
 			})}
-			client, err := NewClient("test-key", "deepseek-test", WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
+			client, err := NewClient("test-key", map[string]string{"": "deepseek-test"}, WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -201,7 +253,7 @@ func TestGenerateWrapsTimeout(t *testing.T) {
 
 	client, err := NewClient(
 		"test-key",
-		"deepseek-test",
+		map[string]string{"": "deepseek-test"},
 		WithEndpoint(server.URL),
 		WithHTTPClient(&http.Client{Timeout: 5 * time.Millisecond}),
 	)
@@ -223,7 +275,7 @@ func TestGenerateRejectsTruncatedChoice(t *testing.T) {
 		})
 		return jsonResponse(http.StatusOK, body), nil
 	})}
-	client, err := NewClient("test-key", "deepseek-test", WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
+	client, err := NewClient("test-key", map[string]string{"": "deepseek-test"}, WithEndpoint("https://deepseek.test"), WithHTTPClient(clientHTTP))
 	if err != nil {
 		t.Fatal(err)
 	}

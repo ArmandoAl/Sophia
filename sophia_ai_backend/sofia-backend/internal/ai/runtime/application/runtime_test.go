@@ -20,7 +20,9 @@ import (
 	authinfra "github.com/armandoalvarado/sofia-backend/internal/auth/infrastructure"
 	insightsapp "github.com/armandoalvarado/sofia-backend/internal/insights/application"
 	insightsinfra "github.com/armandoalvarado/sofia-backend/internal/insights/infrastructure"
+	learningapp "github.com/armandoalvarado/sofia-backend/internal/learning/application"
 	learningdomain "github.com/armandoalvarado/sofia-backend/internal/learning/domain"
+	learninginfra "github.com/armandoalvarado/sofia-backend/internal/learning/infrastructure"
 	memoryapp "github.com/armandoalvarado/sofia-backend/internal/memory/application"
 	memorydomain "github.com/armandoalvarado/sofia-backend/internal/memory/domain"
 	memoryinfra "github.com/armandoalvarado/sofia-backend/internal/memory/infrastructure"
@@ -100,6 +102,77 @@ func TestContextBuilderColdStartWithoutPromptVersion(t *testing.T) {
 	}
 	if summary.PromptBase != "" {
 		t.Fatalf("cold start should have empty prompt base, got %q", summary.PromptBase)
+	}
+}
+
+func TestContextBuilderAddsExplicitContextBeliefsToPromptSuffix(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-context", "context@example.com")
+	learning := learningapp.NewService(
+		learninginfra.NewInMemoryBeliefRepository(),
+		learninginfra.NewInMemoryPromptVersionRepository(),
+		learninginfra.NewInMemoryDailySummaryRepository(),
+	)
+	learning.SetContextRepository(learninginfra.NewInMemoryUserContextRepository())
+	if _, err := learning.CreateUserContext(ctx, user.ID, learningdomain.UserContextCreate{Kind: learningdomain.ScopePerson, Slug: "maria", Label: "María"}); err != nil {
+		t.Fatal(err)
+	}
+	statement := "Con María usa un tono cariñoso"
+	if _, err := learning.UpsertBelief(ctx, user.ID, statement, learningdomain.CategoryCommunication, learningdomain.ScopePerson, "person:maria"); err != nil {
+		t.Fatal(err)
+	}
+	env.contextBuilder.SetLearningContextReader(learning)
+
+	summary, err := env.contextBuilder.Build(ctx, user.ID, "hola", "person:maria")
+	if err != nil {
+		t.Fatal(err)
+	}
+	suffix, err := runtimedomain.BuildPromptSuffix(runtimedomain.ModelRequest{Message: "hola", Context: summary})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(suffix), `"active_context":{"scope_key":"person:maria","label":"María"`) || !strings.Contains(string(suffix), statement) {
+		t.Fatalf("active context missing from suffix: %s", suffix)
+	}
+	prefix, err := runtimedomain.BuildPromptPrefix(runtimedomain.ModelRequest{PromptBase: summary.PromptBase})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(prefix), statement) {
+		t.Fatalf("context belief leaked into prefix: %s", prefix)
+	}
+}
+
+func TestContextBuilderResolvesActiveActivityAlias(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-activity-context", "activity-context@example.com")
+	learning := learningapp.NewService(
+		learninginfra.NewInMemoryBeliefRepository(),
+		learninginfra.NewInMemoryPromptVersionRepository(),
+		learninginfra.NewInMemoryDailySummaryRepository(),
+	)
+	learning.SetContextRepository(learninginfra.NewInMemoryUserContextRepository())
+	if _, err := learning.CreateUserContext(ctx, user.ID, learningdomain.UserContextCreate{Kind: learningdomain.ScopePerson, Slug: "maria", Label: "María", Aliases: []string{"mari"}}); err != nil {
+		t.Fatal(err)
+	}
+	env.contextBuilder.SetLearningContextReader(learning)
+	activity, err := env.activities.CreateActivity(ctx, user.ID, activitiesdomain.ActivityCreate{Title: "Preparar reunión con Mari", Timezone: "UTC"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := activitiesdomain.StatusActive
+	if _, err := env.activities.UpdateActivity(ctx, user.ID, activity.ID, activitiesdomain.ActivityUpdate{Status: &status}); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := env.contextBuilder.Build(ctx, user.ID, "ayúdame")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.ActiveContext == nil || summary.ActiveContext.ScopeKey != "person:maria" {
+		t.Fatalf("activity alias did not resolve context: %+v", summary.ActiveContext)
 	}
 }
 
@@ -473,6 +546,9 @@ func TestHandleMessagePassesHistoryToModelRequest(t *testing.T) {
 	}
 	if len(recorder.requests) != 1 {
 		t.Fatalf("expected 1 model request, got %d", len(recorder.requests))
+	}
+	if recorder.requests[0].Task != runtimedomain.TaskPlan {
+		t.Fatalf("expected plan task, got %q", recorder.requests[0].Task)
 	}
 	history := recorder.requests[0].History
 	if len(history) != 1 || history[0].Content != "Recuérdame estudiar mañana" {

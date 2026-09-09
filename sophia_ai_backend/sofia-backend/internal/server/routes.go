@@ -8,7 +8,9 @@ import (
 	runtimeHTTP "github.com/armandoalvarado/sofia-backend/internal/ai/runtime/interfaces/http"
 	authHTTP "github.com/armandoalvarado/sofia-backend/internal/auth/interfaces/http"
 	conversationsHTTP "github.com/armandoalvarado/sofia-backend/internal/conversations/interfaces/http"
+	ingestionHTTP "github.com/armandoalvarado/sofia-backend/internal/ingestion/interfaces/http"
 	insightsHTTP "github.com/armandoalvarado/sofia-backend/internal/insights/interfaces/http"
+	learningHTTP "github.com/armandoalvarado/sofia-backend/internal/learning/interfaces/http"
 	memoryHTTP "github.com/armandoalvarado/sofia-backend/internal/memory/interfaces/http"
 	notificationsHTTP "github.com/armandoalvarado/sofia-backend/internal/notifications/interfaces/http"
 	privacyHTTP "github.com/armandoalvarado/sofia-backend/internal/privacy/interfaces/http"
@@ -24,12 +26,14 @@ type Routes struct {
 	Reminders     *remindersHTTP.Handler
 	Insights      *insightsHTTP.Handler
 	Memory        *memoryHTTP.Handler
+	Contexts      *learningHTTP.Handler
 	Notifications *notificationsHTTP.Handler
 	Privacy       *privacyHTTP.Handler
 	Tools         *toolsHTTP.Handler
 	AIActions     *actionsHTTP.Handler
 	AIRuntime     *runtimeHTTP.Handler
 	Conversations *conversationsHTTP.Handler
+	Ingestion     *ingestionHTTP.Handler
 	Health        HealthHandler
 	Authn         Middleware
 	AuthRateLimit Middleware
@@ -58,6 +62,8 @@ func (r Routes) Handler() http.Handler {
 	mux.Handle("/memory", r.Authn(http.HandlerFunc(r.Memory.Collection)))
 	mux.Handle("/memory/search", r.Authn(http.HandlerFunc(r.Memory.Search)))
 	mux.Handle("/memory/", r.Authn(http.HandlerFunc(r.Memory.Resource)))
+	mux.Handle("/contexts", r.Authn(http.HandlerFunc(r.Contexts.Collection)))
+	mux.Handle("/contexts/", r.Authn(http.HandlerFunc(r.Contexts.Resource)))
 	mux.Handle("/notifications/device-tokens", r.Authn(http.HandlerFunc(r.Notifications.Collection)))
 	mux.Handle("/notifications/device-tokens/", r.Authn(http.HandlerFunc(r.Notifications.Resource)))
 	mux.Handle("/tools", r.Authn(http.HandlerFunc(r.Tools.Collection)))
@@ -67,6 +73,8 @@ func (r Routes) Handler() http.Handler {
 	mux.Handle("/ai/runtime/message", r.Authn(http.HandlerFunc(r.AIRuntime.Message)))
 	mux.Handle("/conversations", r.Authn(http.HandlerFunc(r.Conversations.Collection)))
 	mux.Handle("/conversations/", r.Authn(http.HandlerFunc(r.Conversations.Resource)))
+	mux.Handle("/ingestion/conversations", r.Authn(http.HandlerFunc(r.Ingestion.Conversations)))
+	mux.Handle("/ingestion/batches/", r.Authn(http.HandlerFunc(r.Ingestion.Batches)))
 	return mux
 }
 

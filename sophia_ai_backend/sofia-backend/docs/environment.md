@@ -19,6 +19,7 @@
 | --- | --- | --- | --- |
 | `PERSISTENCE_DRIVER` | `memory` | production | `memory` or `firestore`. Production requires `firestore`. |
 | `FIRESTORE_PROJECT_ID` | empty | when Firestore is enabled | Google Cloud/Firebase project ID. |
+| `GOOGLE_CLOUD_PROJECT` | `FIRESTORE_PROJECT_ID` | when embeddings are enabled | Google Cloud project used by Vertex AI. Firestore also uses it when `FIRESTORE_PROJECT_ID` is empty. |
 | `FIRESTORE_DATABASE_ID` | empty | no | Optional named Firestore database ID. When empty, the SDK default database behavior is used. Set to `default` if your Firebase/Firestore database is named `default`. |
 | `GOOGLE_APPLICATION_CREDENTIALS` | empty | local Firestore with service account | Path to local Google credentials. Do not commit credential JSON files. |
 | `FIRESTORE_EMULATOR_HOST` | empty | emulator only | Firestore emulator host, for example `localhost:8081`. |
@@ -38,9 +39,27 @@
 | --- | --- | --- | --- |
 | `AI_RUNTIME_ENABLED` | `true` | no | Enables the AI runtime wiring. When false, the app uses the fake provider path. |
 | `AI_RUNTIME_PROPOSAL_ONLY` | `true` | yes | Must remain true. `false` is rejected because autonomous execution is not supported yet. |
-| `AI_MODEL_PROVIDER` | `fake` | no | `fake` or `gemini`. |
-| `GEMINI_API_KEY` | empty | when `AI_MODEL_PROVIDER=gemini` | Gemini API key. Never commit or log this value. |
-| `GEMINI_MODEL` | `gemini-1.5-flash` | when `AI_MODEL_PROVIDER=gemini` | Gemini model name used by the runtime provider. Documented values: `gemini-2.5-flash`, `gemini-1.5-flash`. |
+| `AI_MODEL_PROVIDER` | `fake` | no | `fake` or `deepseek`. |
+| `DEEPSEEK_API_KEY` | empty | when `AI_MODEL_PROVIDER=deepseek` | DeepSeek API key. Never commit or log this value. |
+| `DEEPSEEK_MODEL` | `deepseek-v4-pro` | when `AI_MODEL_PROVIDER=deepseek` | Default model for tasks without an override. |
+| `DEEPSEEK_MODEL_PLAN` | `DEEPSEEK_MODEL` | no | Optional model override for planning. |
+| `DEEPSEEK_MODEL_SYNTHESIZE` | `DEEPSEEK_MODEL` | no | Optional model override for daily synthesis. |
+| `DEEPSEEK_MODEL_EXTRACT` | `DEEPSEEK_MODEL` | no | Optional model override for extraction. |
+| `DEEPSEEK_BASE_URL` | DeepSeek API | no | Optional API base URL override. |
+
+## Embeddings
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `EMBEDDINGS_ENABLED` | `false` | no | Enables Vertex AI embeddings for semantic belief deduplication. |
+| `EMBEDDINGS_MODEL` | empty | when embeddings are enabled | Vertex AI text embedding model ID. |
+| `BELIEF_DEDUPE_THRESHOLD` | `0.85` | no | Minimum cosine similarity for beliefs in the same category. |
+
+## Ingestion Worker
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `INGESTION_MAX_TOKENS_PER_BATCH` | `50000` | no | Hard input plus output token budget for one imported batch. |
 
 ## Reminder Worker
 

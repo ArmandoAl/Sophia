@@ -27,30 +27,43 @@ const (
 	PromptSlotCore        = "core"
 	PromptSlotSituational = "situational"
 
-	InitialConfidence    = 0.4
-	ReinforceRate        = 0.2
-	ContradictionWeight  = 2.5
-	HalfLifeDays         = 90.0
-	HighOverlapJaccard   = 0.5
-	defaultSearchTermMax = 40
-	defaultSearchLimit   = 10
-	defaultListLimit     = 50
+	ScopeGlobal = "global"
+	ScopePerson = "person"
+	ScopeMode   = "mode"
+
+	TrustDecision = 1
+	TrustStated   = 2
+	TrustInferred = 3
+
+	InitialConfidence           = 0.4
+	ReinforceRate               = 0.2
+	ContradictionWeight         = 2.5
+	HalfLifeDays                = 90.0
+	HighOverlapJaccard          = 0.5
+	defaultSearchTermMax        = 40
+	defaultSearchLimit          = 10
+	defaultListLimit            = 50
+	ContextFragmentTokenCeiling = 300
 )
 
 var (
-	ErrBeliefNotFound        = errors.New("belief not found")
-	ErrInvalidStatement      = errors.New("statement is required")
-	ErrInvalidCategory       = errors.New("invalid belief category")
-	ErrInvalidStatus         = errors.New("invalid belief status")
-	ErrInvalidPromptSlot     = errors.New("invalid prompt slot")
-	ErrInvalidSupersede      = errors.New("supersede target is required")
-	ErrBeliefNotActive       = errors.New("belief is not active")
-	ErrInvalidConfidence     = errors.New("confidence must be between 0 and 1")
-	ErrPromptVersionNotFound = errors.New("prompt version not found")
-	ErrInvalidPromptContent  = errors.New("prompt content is required")
-	ErrDailySummaryNotFound  = errors.New("daily summary not found")
-	ErrDailySummaryExists    = errors.New("daily summary already exists for this date")
-	ErrInvalidDate           = errors.New("date must be YYYY-MM-DD")
+	ErrBeliefNotFound            = errors.New("belief not found")
+	ErrInvalidStatement          = errors.New("statement is required")
+	ErrInvalidCategory           = errors.New("invalid belief category")
+	ErrInvalidStatus             = errors.New("invalid belief status")
+	ErrInvalidPromptSlot         = errors.New("invalid prompt slot")
+	ErrInvalidSupersede          = errors.New("supersede target is required")
+	ErrBeliefNotActive           = errors.New("belief is not active")
+	ErrInvalidConfidence         = errors.New("confidence must be between 0 and 1")
+	ErrInvalidScope              = errors.New("invalid belief scope")
+	ErrInvalidScopeKey           = errors.New("invalid belief scope key")
+	ErrInvalidTrustTier          = errors.New("invalid belief trust tier")
+	ErrPromptVersionNotFound     = errors.New("prompt version not found")
+	ErrInvalidPromptContent      = errors.New("prompt content is required")
+	ErrDailySummaryNotFound      = errors.New("daily summary not found")
+	ErrDailySummaryAlreadyExists = errors.New("daily summary already exists for this date")
+	ErrDailySummaryExists        = ErrDailySummaryAlreadyExists
+	ErrInvalidDate               = errors.New("date must be YYYY-MM-DD")
 )
 
 type Belief struct {
@@ -70,12 +83,21 @@ type Belief struct {
 	PromptSlot         string
 	TokenCost          int
 	SearchTerms        []string
+	Embedding          []float32
+	Scope              string
+	ScopeKey           string
+	TrustTier          int
+	BatchID            string
 }
 
 type BeliefCreate struct {
 	Statement  string
 	Category   string
 	PromptSlot string
+	Scope      string
+	ScopeKey   string
+	TrustTier  int
+	BatchID    string
 }
 
 type BeliefRepository interface {
@@ -83,8 +105,10 @@ type BeliefRepository interface {
 	Update(ctx context.Context, belief *Belief) error
 	FindByID(ctx context.Context, userID, beliefID string) (*Belief, error)
 	ListActive(ctx context.Context, userID string, limit int) ([]*Belief, error)
+	ListActiveByScope(ctx context.Context, userID, scope, scopeKey string, limit int) ([]*Belief, error)
 	SearchByTerms(ctx context.Context, userID string, terms []string, limit int) ([]*Belief, error)
 	SetPromptSlot(ctx context.Context, userID, beliefID, slot string) (*Belief, error)
+	RetireByBatchID(ctx context.Context, userID, batchID string) (int, error)
 }
 
 func NewBelief(id, userID string, input BeliefCreate) (*Belief, error) {
@@ -100,6 +124,10 @@ func NewBelief(id, userID string, input BeliefCreate) (*Belief, error) {
 		LastReinforcedAt: now,
 		Status:           StatusActive,
 		PromptSlot:       strings.TrimSpace(input.PromptSlot),
+		Scope:            effectiveScope(input.Scope),
+		ScopeKey:         strings.ToLower(strings.TrimSpace(input.ScopeKey)),
+		TrustTier:        input.TrustTier,
+		BatchID:          strings.TrimSpace(input.BatchID),
 	}
 	belief.refreshDerived()
 	if err := belief.Validate(); err != nil {
@@ -108,10 +136,18 @@ func NewBelief(id, userID string, input BeliefCreate) (*Belief, error) {
 	return belief, nil
 }
 
-func (b *Belief) Reinforce() {
+func (b *Belief) Reinforce(incomingTier ...int) {
+	tier := TrustDecision
+	if len(incomingTier) > 0 {
+		tier = incomingTier[0]
+	}
+	if tier == TrustDecision {
+		b.TrustTier = TrustDecision
+	}
 	now := time.Now().UTC()
 	b.EvidenceCount++
-	b.Confidence = clamp01(b.Confidence + (1-b.Confidence)*ReinforceRate)
+	ceiling := trustCeiling(b.EffectiveTrustTier())
+	b.Confidence = math.Min(ceiling, clamp01(b.Confidence+(1-b.Confidence)*ReinforceRate))
 	b.LastReinforcedAt = now
 }
 
@@ -167,7 +203,34 @@ func (b *Belief) Validate() error {
 	if b.Confidence < 0 || b.Confidence > 1 {
 		return ErrInvalidConfidence
 	}
+	if !IsValidScope(b.Scope) {
+		return ErrInvalidScope
+	}
+	if !isValidScopeKey(b.EffectiveScope(), b.ScopeKey) {
+		return ErrInvalidScopeKey
+	}
+	if !IsValidTrustTier(b.TrustTier) {
+		return ErrInvalidTrustTier
+	}
+	if b.Confidence > trustCeiling(b.EffectiveTrustTier()) {
+		return ErrInvalidConfidence
+	}
 	return nil
+}
+
+func (b *Belief) EffectiveScope() string {
+	return effectiveScope(b.Scope)
+}
+
+func (b *Belief) EffectiveTrustTier() int {
+	if b.TrustTier == 0 {
+		return TrustDecision
+	}
+	return b.TrustTier
+}
+
+func (b *Belief) SetInitialConfidence(confidence float64) {
+	b.Confidence = math.Min(clamp01(confidence), trustCeiling(b.EffectiveTrustTier()))
 }
 
 func (b *Belief) refreshDerived() {
@@ -208,6 +271,46 @@ func IsValidPromptSlot(value string) bool {
 	default:
 		return false
 	}
+}
+
+func IsValidScope(value string) bool {
+	switch effectiveScope(value) {
+	case ScopeGlobal, ScopePerson, ScopeMode:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsValidTrustTier(value int) bool {
+	return value == 0 || value == TrustDecision || value == TrustStated || value == TrustInferred
+}
+
+func trustCeiling(tier int) float64 {
+	switch tier {
+	case TrustStated:
+		return 0.8
+	case TrustInferred:
+		return 0.5
+	default:
+		return 1
+	}
+}
+
+func effectiveScope(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return ScopeGlobal
+	}
+	return value
+}
+
+func isValidScopeKey(scope, key string) bool {
+	key = strings.TrimSpace(key)
+	if scope == ScopeGlobal {
+		return key == ""
+	}
+	return strings.HasPrefix(key, scope+":") && strings.TrimPrefix(key, scope+":") != "" && !strings.Contains(strings.TrimPrefix(key, scope+":"), ":")
 }
 
 func HasHighTermOverlap(a, b []string) bool {

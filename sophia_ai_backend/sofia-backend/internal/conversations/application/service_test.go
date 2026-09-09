@@ -69,13 +69,16 @@ func TestSendMessagePassesPriorTurnsAsHistory(t *testing.T) {
 	if _, err := service.SendMessage(ctx, "user-1", conversation.ID, "Recuérdame estudiar mañana"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := service.SendMessage(ctx, "user-1", conversation.ID, "mejor a las 4"); err != nil {
+	if _, err := service.SendMessage(ctx, "user-1", conversation.ID, "mejor a las 4", "person:maria"); err != nil {
 		t.Fatal(err)
 	}
 	if len(runtime.requests) != 2 {
 		t.Fatalf("expected 2 runtime requests, got %d", len(runtime.requests))
 	}
 	second := runtime.requests[1]
+	if second.ActiveContext != "person:maria" {
+		t.Fatalf("active context = %q, want person:maria", second.ActiveContext)
+	}
 	if len(second.History) < 2 {
 		t.Fatalf("expected prior turns in history, got %+v", second.History)
 	}

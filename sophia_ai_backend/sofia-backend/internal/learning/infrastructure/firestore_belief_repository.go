@@ -39,6 +39,11 @@ type firestoreBelief struct {
 	PromptSlot         string     `firestore:"prompt_slot"`
 	TokenCost          int        `firestore:"token_cost"`
 	SearchTerms        []string   `firestore:"search_terms"`
+	Embedding          []float64  `firestore:"embedding"`
+	Scope              string     `firestore:"scope"`
+	ScopeKey           string     `firestore:"scope_key"`
+	TrustTier          int        `firestore:"trust_tier"`
+	BatchID            string     `firestore:"batch_id"`
 }
 
 func NewFirestoreBeliefRepository(client *firestore.Client) *FirestoreBeliefRepository {
@@ -92,6 +97,37 @@ func (r *FirestoreBeliefRepository) ListActive(ctx context.Context, userID strin
 	return r.collect(ctx, query)
 }
 
+func (r *FirestoreBeliefRepository) ListActiveByScope(ctx context.Context, userID, scope, scopeKey string, limit int) ([]*domain.Belief, error) {
+	if scope == domain.ScopeGlobal {
+		beliefs, err := r.ListActive(ctx, userID, 0)
+		if err != nil {
+			return nil, err
+		}
+		result := make([]*domain.Belief, 0, len(beliefs))
+		for _, belief := range beliefs {
+			if belief.EffectiveScope() == domain.ScopeGlobal && belief.ScopeKey == "" {
+				result = append(result, belief)
+			}
+		}
+		if limit > 0 && len(result) > limit {
+			result = result[:limit]
+		}
+		return result, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	query := r.client.Collection(userBeliefsCollection).
+		Where("user_id", "==", userID).
+		Where("scope", "==", scope).
+		Where("scope_key", "==", scopeKey).
+		Where("status", "==", domain.StatusActive).
+		OrderBy("confidence", firestore.Desc)
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	return r.collect(ctx, query)
+}
+
 func (r *FirestoreBeliefRepository) SearchByTerms(ctx context.Context, userID string, terms []string, limit int) ([]*domain.Belief, error) {
 	terms = memorydomain.CapSearchTerms(terms)
 	if len(terms) == 0 {
@@ -135,6 +171,30 @@ func (r *FirestoreBeliefRepository) SetPromptSlot(ctx context.Context, userID, b
 	return belief, nil
 }
 
+func (r *FirestoreBeliefRepository) RetireByBatchID(ctx context.Context, userID, batchID string) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	iter := r.client.Collection(userBeliefsCollection).
+		Where("user_id", "==", userID).
+		Where("batch_id", "==", batchID).
+		Documents(ctx)
+	defer iter.Stop()
+	count := 0
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			return count, nil
+		}
+		if err != nil {
+			return count, err
+		}
+		if _, err := doc.Ref.Update(ctx, []firestore.Update{{Path: "status", Value: domain.StatusRetired}}); err != nil {
+			return count, err
+		}
+		count++
+	}
+}
+
 func (r *FirestoreBeliefRepository) collect(ctx context.Context, query firestore.Query) ([]*domain.Belief, error) {
 	iter := query.Documents(ctx)
 	defer iter.Stop()
@@ -174,6 +234,11 @@ func beliefToDocument(belief *domain.Belief) firestoreBelief {
 		PromptSlot:         belief.PromptSlot,
 		TokenCost:          belief.TokenCost,
 		SearchTerms:        cloneStrings(belief.SearchTerms),
+		Embedding:          float32sToFloat64s(belief.Embedding),
+		Scope:              belief.Scope,
+		ScopeKey:           belief.ScopeKey,
+		TrustTier:          belief.TrustTier,
+		BatchID:            belief.BatchID,
 	}
 }
 
@@ -203,5 +268,26 @@ func (m firestoreBelief) toDomain() *domain.Belief {
 		PromptSlot:         m.PromptSlot,
 		TokenCost:          m.TokenCost,
 		SearchTerms:        cloneStrings(m.SearchTerms),
+		Embedding:          float64sToFloat32s(m.Embedding),
+		Scope:              m.Scope,
+		ScopeKey:           m.ScopeKey,
+		TrustTier:          m.TrustTier,
+		BatchID:            m.BatchID,
 	}
+}
+
+func float32sToFloat64s(values []float32) []float64 {
+	result := make([]float64, len(values))
+	for i, value := range values {
+		result[i] = float64(value)
+	}
+	return result
+}
+
+func float64sToFloat32s(values []float64) []float32 {
+	result := make([]float32, len(values))
+	for i, value := range values {
+		result[i] = float32(value)
+	}
+	return result
 }

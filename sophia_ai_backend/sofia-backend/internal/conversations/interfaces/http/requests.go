@@ -7,7 +7,8 @@ type createConversationRequest struct {
 }
 
 type sendMessageRequest struct {
-	Content string `json:"content"`
+	Content       string `json:"content"`
+	ActiveContext string `json:"active_context"`
 }
 
 func (r createConversationRequest) toDomain() domain.CreateConversationInput {

@@ -45,6 +45,9 @@ func TestLoadDefaultsDevelopment(t *testing.T) {
 	if cfg.AutonomyThreshold != 0.85 {
 		t.Fatalf("expected default autonomy threshold 0.85, got %v", cfg.AutonomyThreshold)
 	}
+	if cfg.EmbeddingsEnabled || cfg.BeliefDedupeThreshold != 0.85 {
+		t.Fatalf("unexpected default embeddings config: %+v", cfg)
+	}
 }
 
 func TestLoadContextTokenBudget(t *testing.T) {
@@ -75,6 +78,7 @@ func TestLoadFirestoreRequiresProjectID(t *testing.T) {
 	t.Setenv("JWT_SECRET", "local-secret")
 	t.Setenv("PERSISTENCE_DRIVER", "firestore")
 	t.Setenv("FIRESTORE_PROJECT_ID", "")
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "")
 
 	if _, err := Load(); err == nil {
 		t.Fatal("expected missing Firestore project ID error")
@@ -241,45 +245,12 @@ func TestLoadRejectsInvalidAIModelProvider(t *testing.T) {
 	}
 }
 
-func TestLoadGeminiRequiresAPIKey(t *testing.T) {
+func TestLoadRejectsGeminiProvider(t *testing.T) {
 	t.Setenv("ENV", "development")
 	t.Setenv("AI_MODEL_PROVIDER", "gemini")
-	t.Setenv("GEMINI_API_KEY", "")
 
 	if _, err := Load(); err == nil {
-		t.Fatal("expected missing GEMINI_API_KEY error")
-	}
-}
-
-func TestLoadSupportsGemini25FlashModel(t *testing.T) {
-	t.Setenv("ENV", "test")
-	t.Setenv("AI_MODEL_PROVIDER", "gemini")
-	t.Setenv("GEMINI_API_KEY", "test-key")
-	t.Setenv("GEMINI_MODEL", "gemini-2.5-flash")
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load returned error: %v", err)
-	}
-	if cfg.GeminiModel != "gemini-2.5-flash" {
-		t.Fatalf("expected gemini-2.5-flash, got %q", cfg.GeminiModel)
-	}
-}
-
-func TestLoadGeminiConfig(t *testing.T) {
-	t.Setenv("ENV", "development")
-	t.Setenv("AI_MODEL_PROVIDER", "gemini")
-	t.Setenv("GEMINI_API_KEY", "test-key")
-	t.Setenv("GEMINI_MODEL", "gemini-test")
-	t.Setenv("AI_RUNTIME_ENABLED", "true")
-	t.Setenv("AI_RUNTIME_PROPOSAL_ONLY", "true")
-
-	cfg, err := Load()
-	if err != nil {
-		t.Fatalf("Load returned error: %v", err)
-	}
-	if cfg.AIModelProvider != "gemini" || cfg.GeminiModel != "gemini-test" || cfg.GeminiAPIKey != "test-key" {
-		t.Fatalf("unexpected Gemini config: %+v", cfg)
+		t.Fatal("expected unsupported Gemini provider error")
 	}
 }
 
@@ -298,14 +269,20 @@ func TestLoadDeepSeekConfig(t *testing.T) {
 	t.Setenv("AI_MODEL_PROVIDER", "deepseek")
 	t.Setenv("DEEPSEEK_API_KEY", "test-key")
 	t.Setenv("DEEPSEEK_MODEL", "deepseek-test")
+	t.Setenv("DEEPSEEK_MODEL_PLAN", "deepseek-plan")
+	t.Setenv("DEEPSEEK_MODEL_SYNTHESIZE", "deepseek-synthesize")
+	t.Setenv("DEEPSEEK_MODEL_EXTRACT", "")
 	t.Setenv("DEEPSEEK_BASE_URL", "https://deepseek.test")
 
 	cfg, err := Load()
 	if err != nil {
 		t.Fatalf("Load returned error: %v", err)
 	}
-	if cfg.AIModelProvider != "deepseek" || cfg.DeepSeekAPIKey != "test-key" || cfg.DeepSeekModel != "deepseek-test" || cfg.DeepSeekBaseURL != "https://deepseek.test" {
+	if cfg.AIModelProvider != "deepseek" || cfg.DeepSeekAPIKey != "test-key" || cfg.DeepSeekBaseURL != "https://deepseek.test" {
 		t.Fatalf("unexpected DeepSeek config: %+v", cfg)
+	}
+	if cfg.DeepSeekModels[""] != "deepseek-test" || cfg.DeepSeekModels["plan"] != "deepseek-plan" || cfg.DeepSeekModels["synthesize"] != "deepseek-synthesize" || cfg.DeepSeekModels["extract"] != "deepseek-test" {
+		t.Fatalf("unexpected DeepSeek models: %+v", cfg.DeepSeekModels)
 	}
 }
 
@@ -335,5 +312,55 @@ func TestLoadRejectsInvalidAutonomyThreshold(t *testing.T) {
 	t.Setenv("AUTONOMY_THRESHOLD", "1.5")
 	if _, err := Load(); err == nil {
 		t.Fatal("expected invalid AUTONOMY_THRESHOLD error")
+	}
+}
+
+func TestLoadEmbeddingsConfig(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("EMBEDDINGS_ENABLED", "true")
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "sofia-test")
+	t.Setenv("EMBEDDINGS_MODEL", "embedding-test")
+	t.Setenv("BELIEF_DEDUPE_THRESHOLD", "0.9")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.EmbeddingsEnabled || cfg.GoogleCloudProject != "sofia-test" || cfg.EmbeddingsModel != "embedding-test" {
+		t.Fatalf("unexpected embeddings config: %+v", cfg)
+	}
+	if cfg.BeliefDedupeThreshold != 0.9 {
+		t.Fatalf("expected threshold 0.9, got %v", cfg.BeliefDedupeThreshold)
+	}
+}
+
+func TestLoadEmbeddingsRequireProjectAndModel(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("EMBEDDINGS_ENABLED", "true")
+	t.Setenv("GOOGLE_CLOUD_PROJECT", "")
+	t.Setenv("FIRESTORE_PROJECT_ID", "")
+	t.Setenv("EMBEDDINGS_MODEL", "")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected missing embeddings configuration error")
+	}
+}
+
+func TestLoadRejectsInvalidBeliefDedupeThreshold(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("BELIEF_DEDUPE_THRESHOLD", "1.5")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected invalid BELIEF_DEDUPE_THRESHOLD error")
+	}
+}
+
+func TestLoadIngestionTokenBudget(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("INGESTION_MAX_TOKENS_PER_BATCH", "1234")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.IngestionMaxTokensPerBatch != 1234 {
+		t.Fatalf("got %d, want 1234", cfg.IngestionMaxTokensPerBatch)
 	}
 }

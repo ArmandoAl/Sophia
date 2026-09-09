@@ -69,7 +69,9 @@ var synthesisOutputSchema = json.RawMessage(`{
         "properties": {
           "statement": {"type": "string"},
           "category": {"type": "string"},
-          "confidence": {"type": "number"}
+          "confidence": {"type": "number"},
+          "scope": {"type": "string"},
+          "scope_key": {"type": "string"}
         }
       }
     }
@@ -145,6 +147,8 @@ type novelBelief struct {
 	Statement  string  `json:"statement"`
 	Category   string  `json:"category"`
 	Confidence float64 `json:"confidence"`
+	Scope      string  `json:"scope"`
+	ScopeKey   string  `json:"scope_key"`
 }
 
 type decisionSignals struct {
@@ -234,8 +238,12 @@ func (w *Worker) RunDaily(ctx context.Context, userID string, day time.Time) err
 	if err != nil {
 		return err
 	}
+	contexts, err := w.deps.Learning.ListUserContexts(ctx, userID)
+	if err != nil {
+		return err
+	}
 
-	message, err := buildSynthesisMessage(beliefs, signals)
+	message, err := buildSynthesisMessage(beliefs, contexts, signals)
 	if err != nil {
 		return err
 	}
@@ -259,12 +267,29 @@ func (w *Worker) RunDaily(ctx context.Context, userID string, day time.Time) err
 		return err
 	}
 
+	summary, err := w.deps.Learning.CreateDailySummary(ctx, userID, learningdomain.DailySummaryCreate{
+		Date:         date,
+		Observations: observationsFrom(signals, output),
+		Stats:        signals.Stats,
+		SynthesisCost: learningdomain.SynthesisCost{
+			InputTokens:  response.Usage.InputTokens,
+			OutputTokens: response.Usage.OutputTokens,
+			Model:        response.Usage.Model,
+			LatencyMS:    latencyMS,
+		},
+	})
+	if errors.Is(err, learningdomain.ErrDailySummaryAlreadyExists) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
 	delta, err := w.applyDelta(ctx, userID, output)
 	if err != nil {
 		return err
 	}
 
-	summaryID := learningdomain.DailySummaryID(userID, date)
 	beforeID := ""
 	if previous, err := w.deps.Learning.GetActivePromptVersion(ctx, userID); err != nil {
 		return err
@@ -272,7 +297,7 @@ func (w *Worker) RunDaily(ctx context.Context, userID string, day time.Time) err
 		beforeID = previous.ID
 	}
 
-	version, err := w.deps.Learning.RecompilePromptBaseFromSummary(ctx, userID, summaryID)
+	version, err := w.deps.Learning.RecompilePromptBaseFromSummary(ctx, userID, summary.ID)
 	if err != nil {
 		return err
 	}
@@ -280,25 +305,18 @@ func (w *Worker) RunDaily(ctx context.Context, userID string, day time.Time) err
 	if version != nil {
 		afterID = version.ID
 		if version.TokenCount > promptTokenCeiling {
-			return errors.New("recompiled prompt exceeded token ceiling")
+			w.recordAudit(ctx, userID, "learning_prompt_token_ceiling_exceeded", "prompt_version", version.ID, map[string]any{
+				"summary_id":    summary.ID,
+				"token_count":   version.TokenCount,
+				"token_ceiling": promptTokenCeiling,
+			})
 		}
 	}
 
-	_, err = w.deps.Learning.CreateDailySummary(ctx, userID, learningdomain.DailySummaryCreate{
-		Date:            date,
-		Observations:    observationsFrom(signals, output),
-		DeltaVsPrevious: delta,
-		Stats:           signals.Stats,
-		SynthesisCost: learningdomain.SynthesisCost{
-			InputTokens:  response.Usage.InputTokens,
-			OutputTokens: response.Usage.OutputTokens,
-			Model:        response.Usage.Model,
-			LatencyMS:    latencyMS,
-		},
-		PromptVersionBefore: beforeID,
-		PromptVersionAfter:  afterID,
-	})
-	if err != nil && !errors.Is(err, learningdomain.ErrDailySummaryExists) {
+	summary.DeltaVsPrevious = delta
+	summary.PromptVersionBefore = beforeID
+	summary.PromptVersionAfter = afterID
+	if err := w.deps.Learning.UpdateDailySummary(ctx, summary); err != nil {
 		return err
 	}
 
@@ -344,7 +362,11 @@ func (w *Worker) applyDelta(ctx context.Context, userID string, output synthesis
 		if !learningdomain.IsValidCategory(item.Category) || strings.TrimSpace(item.Statement) == "" {
 			continue
 		}
-		belief, err := w.deps.Learning.ApplyNovelBelief(ctx, userID, item.Statement, item.Category, item.Confidence)
+		scope, scopeKey, err := w.validNovelScope(ctx, userID, item.Scope, item.ScopeKey)
+		if err != nil {
+			return learningdomain.DailyDelta{}, err
+		}
+		belief, err := w.deps.Learning.ApplyNovelBelief(ctx, userID, item.Statement, item.Category, item.Confidence, scope, scopeKey)
 		if err != nil {
 			return learningdomain.DailyDelta{}, err
 		}
@@ -364,9 +386,25 @@ func (w *Worker) applyDelta(ctx context.Context, userID string, output synthesis
 	return delta, nil
 }
 
+func (w *Worker) validNovelScope(ctx context.Context, userID, scope, scopeKey string) (string, string, error) {
+	scope = strings.ToLower(strings.TrimSpace(scope))
+	scopeKey = strings.ToLower(strings.TrimSpace(scopeKey))
+	if scope != learningdomain.ScopePerson && scope != learningdomain.ScopeMode {
+		return learningdomain.ScopeGlobal, "", nil
+	}
+	contextValue, err := w.deps.Learning.FindUserContextByScopeKey(ctx, userID, scopeKey)
+	if err != nil {
+		return "", "", err
+	}
+	if contextValue == nil || contextValue.Kind != scope {
+		return learningdomain.ScopeGlobal, "", nil
+	}
+	return scope, contextValue.ScopeKey(), nil
+}
+
 func matchReplacement(old *learningdomain.Belief, novels []*learningdomain.Belief) *learningdomain.Belief {
 	for _, novel := range novels {
-		if novel.Category != old.Category {
+		if novel.Category != old.Category || novel.EffectiveScope() != old.EffectiveScope() || novel.ScopeKey != old.ScopeKey {
 			continue
 		}
 		if learningdomain.HasHighTermOverlap(old.SearchTerms, novel.SearchTerms) {
@@ -485,7 +523,7 @@ func extractSignals(proposals []*actionsdomain.AIActionProposal) decisionSignals
 	return signals
 }
 
-func buildSynthesisMessage(beliefs []*learningdomain.Belief, signals decisionSignals) (string, error) {
+func buildSynthesisMessage(beliefs []*learningdomain.Belief, contexts []*learningdomain.UserContext, signals decisionSignals) (string, error) {
 	prior := make([]map[string]any, 0, len(beliefs))
 	for _, belief := range beliefs {
 		prior = append(prior, map[string]any{
@@ -496,7 +534,15 @@ func buildSynthesisMessage(beliefs []*learningdomain.Belief, signals decisionSig
 			"evidence_count":      belief.EvidenceCount,
 			"contradiction_count": belief.ContradictionCount,
 			"prompt_slot":         belief.PromptSlot,
+			"scope":               belief.EffectiveScope(),
+			"scope_key":           belief.ScopeKey,
 		})
+	}
+	availableContexts := make([]map[string]string, 0, len(contexts))
+	for _, contextValue := range contexts {
+		if contextValue != nil && contextValue.Active {
+			availableContexts = append(availableContexts, map[string]string{"scope_key": contextValue.ScopeKey(), "label": contextValue.Label})
+		}
 	}
 	payload := map[string]any{
 		"instructions": []string{
@@ -504,8 +550,10 @@ func buildSynthesisMessage(beliefs []*learningdomain.Belief, signals decisionSig
 			"Do not read or infer from conversations, messages, or free-form chat.",
 			"A day with chatter and no proposals is zero signal.",
 			"Return JSON with reinforced, contradicted, and novel. No extra keys.",
+			"Novel beliefs may use only a scope_key from available_contexts; otherwise use global scope with an empty scope_key.",
 		},
-		"active_beliefs": prior,
+		"active_beliefs":     prior,
+		"available_contexts": availableContexts,
 		"decisions": map[string]any{
 			"corrections":       signals.Corrections,
 			"rejections":        signals.Rejections,

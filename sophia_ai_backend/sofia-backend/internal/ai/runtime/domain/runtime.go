@@ -23,6 +23,7 @@ type RuntimeRequest struct {
 	RequestID      string
 	ConversationID string
 	History        []Turn
+	ActiveContext  string
 }
 
 type Turn struct {
@@ -62,6 +63,13 @@ type ContextSummary struct {
 	MemoryIncluded    bool              `json:"memory_included"`
 	RemindersIncluded bool              `json:"reminders_included"`
 	PromptBase        string            `json:"-"`
+	ActiveContext     *ActiveContext    `json:"-"`
+}
+
+type ActiveContext struct {
+	ScopeKey string   `json:"scope_key"`
+	Label    string   `json:"label"`
+	Beliefs  []string `json:"beliefs"`
 }
 
 type TokenBudget struct {
@@ -135,7 +143,11 @@ type ModelRequest struct {
 	Task       string
 }
 
-const TaskSynthesize = "synthesize"
+const (
+	TaskPlan       = "plan"
+	TaskSynthesize = "synthesize"
+	TaskExtract    = "extract"
+)
 
 type Usage struct {
 	InputTokens       int    `json:"input_tokens,omitempty"`
@@ -151,7 +163,7 @@ type ModelResponse struct {
 }
 
 type ContextBuilder interface {
-	Build(ctx context.Context, userID, message string) (ContextSummary, error)
+	Build(ctx context.Context, userID, message string, activeContext ...string) (ContextSummary, error)
 }
 
 type Planner interface {

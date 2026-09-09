@@ -24,6 +24,9 @@ func (c *FakeModelClient) Generate(_ context.Context, request domain.ModelReques
 			Usage:            domain.Usage{Model: "fake"},
 		}, nil
 	}
+	if request.Task == domain.TaskExtract {
+		return domain.ModelResponse{AssistantMessage: `{"beliefs":[]}`, Usage: domain.Usage{Model: "fake"}}, nil
+	}
 	response := domain.ModelResponse{
 		AssistantMessage: "AI Runtime is ready, but no model provider is configured yet.",
 		Usage:            domain.Usage{Model: "fake"},

@@ -49,6 +49,24 @@ func TestContradictLowersConfidenceFasterThanReinforce(t *testing.T) {
 	}
 }
 
+func TestReinforceHonorsTrustCeilings(t *testing.T) {
+	for _, test := range []struct {
+		tier    int
+		ceiling float64
+	}{{TrustDecision, 1}, {TrustStated, 0.8}, {TrustInferred, 0.5}} {
+		belief, err := NewBelief("belief", "user", BeliefCreate{Statement: "prefers mornings", Category: CategorySchedule, TrustTier: test.tier})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for i := 0; i < 100; i++ {
+			belief.Reinforce(test.tier)
+		}
+		if belief.Confidence > test.ceiling {
+			t.Fatalf("tier %d confidence %f exceeded %f", test.tier, belief.Confidence, test.ceiling)
+		}
+	}
+}
+
 func TestDecayedConfidenceHalvesAfterHalfLife(t *testing.T) {
 	belief := mustBelief(t, "Prefiere trabajo profundo por la mañana", CategoryWorkStyle)
 	belief.Confidence = 0.8

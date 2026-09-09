@@ -12,7 +12,9 @@ import (
 	authHTTP "github.com/armandoalvarado/sofia-backend/internal/auth/interfaces/http"
 	"github.com/armandoalvarado/sofia-backend/internal/config"
 	conversationsHTTP "github.com/armandoalvarado/sofia-backend/internal/conversations/interfaces/http"
+	ingestionHTTP "github.com/armandoalvarado/sofia-backend/internal/ingestion/interfaces/http"
 	insightsHTTP "github.com/armandoalvarado/sofia-backend/internal/insights/interfaces/http"
+	learningHTTP "github.com/armandoalvarado/sofia-backend/internal/learning/interfaces/http"
 	memoryHTTP "github.com/armandoalvarado/sofia-backend/internal/memory/interfaces/http"
 	notificationsHTTP "github.com/armandoalvarado/sofia-backend/internal/notifications/interfaces/http"
 	privacyHTTP "github.com/armandoalvarado/sofia-backend/internal/privacy/interfaces/http"
@@ -29,12 +31,14 @@ type Handlers struct {
 	Reminders     *remindersHTTP.Handler
 	Insights      *insightsHTTP.Handler
 	Memory        *memoryHTTP.Handler
+	Contexts      *learningHTTP.Handler
 	Notifications *notificationsHTTP.Handler
 	Privacy       *privacyHTTP.Handler
 	Tools         *toolsHTTP.Handler
 	AIActions     *actionsHTTP.Handler
 	AIRuntime     *runtimeHTTP.Handler
 	Conversations *conversationsHTTP.Handler
+	Ingestion     *ingestionHTTP.Handler
 	rateLimit     int
 	rateWindow    time.Duration
 }
@@ -55,12 +59,14 @@ func BuildHandlers(cfg config.Config, repositories *Repositories, modules *Modul
 		Reminders:     remindersHTTP.NewHandler(modules.Reminders, cfg.RequestBodyLimitBytes),
 		Insights:      insightsHTTP.NewHandler(modules.Insights, cfg.RequestBodyLimitBytes),
 		Memory:        memoryHTTP.NewHandler(modules.Memory, cfg.RequestBodyLimitBytes),
+		Contexts:      learningHTTP.NewHandler(modules.Learning, cfg.RequestBodyLimitBytes),
 		Notifications: notificationsHTTP.NewHandler(modules.Notifications, cfg.RequestBodyLimitBytes),
 		Privacy:       privacyHTTP.NewHandler(modules.Privacy, cfg.RequestBodyLimitBytes),
 		Tools:         toolsHTTP.NewHandler(modules.Tools),
 		AIActions:     actionsHTTP.NewHandler(modules.Actions, cfg.RequestBodyLimitBytes),
 		AIRuntime:     runtimeHTTP.NewHandler(modules.AIRuntime, cfg.RequestBodyLimitBytes),
 		Conversations: conversationsHTTP.NewHandler(modules.Conversations, cfg.RequestBodyLimitBytes),
+		Ingestion:     ingestionHTTP.NewHandler(modules.Ingestion, cfg.RequestBodyLimitBytes),
 		rateLimit:     cfg.AuthRateLimitRequests,
 		rateWindow:    cfg.AuthRateLimitWindow,
 	}
@@ -74,12 +80,14 @@ func (h *Handlers) Routes(tokenService *authjwt.Service, environment, firestoreS
 		Reminders:     h.Reminders,
 		Insights:      h.Insights,
 		Memory:        h.Memory,
+		Contexts:      h.Contexts,
 		Notifications: h.Notifications,
 		Privacy:       h.Privacy,
 		Tools:         h.Tools,
 		AIActions:     h.AIActions,
 		AIRuntime:     h.AIRuntime,
 		Conversations: h.Conversations,
+		Ingestion:     h.Ingestion,
 		Health:        server.HealthHandler{Environment: environment, FirestoreStatus: firestoreStatus},
 		Authn:         server.AuthMiddleware(tokenService),
 		AuthRateLimit: server.NewRateLimiter(h.rateLimit, h.rateWindow).Middleware,

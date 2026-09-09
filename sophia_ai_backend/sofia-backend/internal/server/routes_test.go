@@ -35,6 +35,9 @@ import (
 	insightsdomain "github.com/armandoalvarado/sofia-backend/internal/insights/domain"
 	insightsinfra "github.com/armandoalvarado/sofia-backend/internal/insights/infrastructure"
 	insightsHTTP "github.com/armandoalvarado/sofia-backend/internal/insights/interfaces/http"
+	learningapp "github.com/armandoalvarado/sofia-backend/internal/learning/application"
+	learninginfra "github.com/armandoalvarado/sofia-backend/internal/learning/infrastructure"
+	learningHTTP "github.com/armandoalvarado/sofia-backend/internal/learning/interfaces/http"
 	memoryapp "github.com/armandoalvarado/sofia-backend/internal/memory/application"
 	memorydomain "github.com/armandoalvarado/sofia-backend/internal/memory/domain"
 	memoryinfra "github.com/armandoalvarado/sofia-backend/internal/memory/infrastructure"
@@ -1518,6 +1521,36 @@ func TestConversationsRequireAuth(t *testing.T) {
 	assertUnauthorized(t, rec)
 }
 
+func TestUserContextEndpoints(t *testing.T) {
+	handler := newTestHandler()
+	token := registerAndLogin(t, handler, "contexts@example.com")
+	created := performJSON(handler, http.MethodPost, "/contexts", map[string]any{
+		"kind": "person", "slug": "maria", "label": "María", "aliases": []string{"mari"},
+	}, token)
+	if created.Code != http.StatusCreated {
+		t.Fatalf("create context failed: %d %s", created.Code, created.Body.String())
+	}
+	var value contextTestResponse
+	decodeResponse(t, created, &value)
+
+	found := performJSON(handler, http.MethodGet, "/contexts?kind=person&slug=maria", nil, token)
+	if found.Code != http.StatusOK {
+		t.Fatalf("find context failed: %d %s", found.Code, found.Body.String())
+	}
+	updated := performJSON(handler, http.MethodPatch, "/contexts/"+value.ID, map[string]any{"label": "María personal"}, token)
+	if updated.Code != http.StatusOK {
+		t.Fatalf("update context failed: %d %s", updated.Code, updated.Body.String())
+	}
+	archived := performJSON(handler, http.MethodPost, "/contexts/"+value.ID+"/archive", nil, token)
+	if archived.Code != http.StatusOK {
+		t.Fatalf("archive context failed: %d %s", archived.Code, archived.Body.String())
+	}
+	decodeResponse(t, archived, &value)
+	if value.Active {
+		t.Fatal("archived context remained active")
+	}
+}
+
 func TestUserExportOnlyIncludesAuthenticatedUsersData(t *testing.T) {
 	handler := newTestHandler()
 	tokenA := registerAndLogin(t, handler, "armando@example.com")
@@ -1705,6 +1738,10 @@ func newTestRoutesWithAuditAndRateLimit(limit int, window time.Duration) (server
 	outcomes := insightsinfra.NewInMemoryActivityOutcomeRepository()
 	reflections := insightsinfra.NewInMemoryReflectionRepository()
 	memories := memoryinfra.NewInMemoryMemoryRepository()
+	beliefs := learninginfra.NewInMemoryBeliefRepository()
+	prompts := learninginfra.NewInMemoryPromptVersionRepository()
+	summaries := learninginfra.NewInMemoryDailySummaryRepository()
+	contexts := learninginfra.NewInMemoryUserContextRepository()
 	toolRepo := toolsinfra.NewInMemoryToolDefinitionRepository()
 	actionRepo := actionsinfra.NewInMemoryAIActionProposalRepository()
 	conversationRepo := conversationsinfra.NewInMemoryConversationRepository()
@@ -1716,6 +1753,8 @@ func newTestRoutesWithAuditAndRateLimit(limit int, window time.Duration) (server
 	remindersService := remindersapp.NewService(reminders, activities, usersService)
 	insightsService := insightsapp.NewService(moods, outcomes, reflections, activities)
 	memoryService := memoryapp.NewService(memories, usersService, nil)
+	learningService := learningapp.NewService(beliefs, prompts, summaries)
+	learningService.SetContextRepository(contexts)
 	toolsService := toolsapp.NewService(toolRepo)
 	if err := toolsService.SeedDefaultTools(context.Background()); err != nil {
 		panic(err)
@@ -1726,6 +1765,8 @@ func newTestRoutesWithAuditAndRateLimit(limit int, window time.Duration) (server
 	actionsService.SetAutonomyThreshold(0.85)
 	activitiesService.SetReminderBridge(remindersService)
 	contextBuilder := runtimeapp.NewContextBuilder(usersService, activitiesService, remindersService, insightsService, memoryService, 5, 4600)
+	contextBuilder.SetPromptBaseReader(learningService)
+	contextBuilder.SetLearningContextReader(learningService)
 	toolSelector := runtimeapp.NewToolSelector(toolsService)
 	planner := runtimeapp.NewPlanner(runtimeinfra.NewFakeModelClient())
 	safety := runtimeapp.NewSafetyPolicy()
@@ -1745,6 +1786,7 @@ func newTestRoutesWithAuditAndRateLimit(limit int, window time.Duration) (server
 	remindersHandler := remindersHTTP.NewHandler(remindersService, testBodyLimit)
 	insightsHandler := insightsHTTP.NewHandler(insightsService, testBodyLimit)
 	memoryHandler := memoryHTTP.NewHandler(memoryService, testBodyLimit)
+	contextsHandler := learningHTTP.NewHandler(learningService, testBodyLimit)
 	privacyHandler := privacyHTTP.NewHandler(privacyService, testBodyLimit)
 	toolsHandler := toolsHTTP.NewHandler(toolsService)
 	actionsHandler := actionsHTTP.NewHandler(actionsService, testBodyLimit)
@@ -1758,6 +1800,7 @@ func newTestRoutesWithAuditAndRateLimit(limit int, window time.Duration) (server
 		Reminders:     remindersHandler,
 		Insights:      insightsHandler,
 		Memory:        memoryHandler,
+		Contexts:      contextsHandler,
 		Privacy:       privacyHandler,
 		Tools:         toolsHandler,
 		AIActions:     actionsHandler,
@@ -1957,6 +2000,11 @@ type memoryTestResponse struct {
 
 type memoriesListTestResponse struct {
 	Memories []memoryTestResponse `json:"memories"`
+}
+
+type contextTestResponse struct {
+	ID     string `json:"id"`
+	Active bool   `json:"active"`
 }
 
 type proposalTestResponse struct {

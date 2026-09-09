@@ -73,7 +73,11 @@ func (s *Service) ListMessages(ctx context.Context, userID, conversationID strin
 	return s.messages.List(ctx, userID, conversationID, limit, cursor)
 }
 
-func (s *Service) SendMessage(ctx context.Context, userID, conversationID, content string) (*SendMessageResult, error) {
+func (s *Service) SendMessage(ctx context.Context, userID, conversationID, content string, activeContexts ...string) (*SendMessageResult, error) {
+	activeContext := ""
+	if len(activeContexts) > 0 {
+		activeContext = activeContexts[0]
+	}
 	conversation, err := s.GetConversation(ctx, userID, conversationID)
 	if err != nil {
 		return nil, err
@@ -102,6 +106,7 @@ func (s *Service) SendMessage(ctx context.Context, userID, conversationID, conte
 		DryRun:         false,
 		ConversationID: conversation.ID,
 		History:        history,
+		ActiveContext:  strings.TrimSpace(activeContext),
 	})
 	if err != nil {
 		return nil, err

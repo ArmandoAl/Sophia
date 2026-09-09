@@ -65,7 +65,22 @@ func (r *FirestoreDailySummaryRepository) Create(ctx context.Context, summary *d
 	defer cancel()
 	_, err := r.client.Collection(dailySummariesCollection).Doc(summary.ID).Create(ctx, dailySummaryToDocument(summary))
 	if status.Code(err) == codes.AlreadyExists {
-		return domain.ErrDailySummaryExists
+		return domain.ErrDailySummaryAlreadyExists
+	}
+	return err
+}
+
+func (r *FirestoreDailySummaryRepository) Update(ctx context.Context, summary *domain.DailySummary) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	doc := dailySummaryToDocument(summary)
+	_, err := r.client.Collection(dailySummariesCollection).Doc(summary.ID).Update(ctx, []firestore.Update{
+		{Path: "delta_vs_previous", Value: doc.DeltaVsPrevious},
+		{Path: "prompt_version_before", Value: doc.PromptVersionBefore},
+		{Path: "prompt_version_after", Value: doc.PromptVersionAfter},
+	})
+	if status.Code(err) == codes.NotFound {
+		return domain.ErrDailySummaryNotFound
 	}
 	return err
 }

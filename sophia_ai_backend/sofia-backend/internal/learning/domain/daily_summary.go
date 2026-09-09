@@ -55,6 +55,7 @@ type DailySummaryCreate struct {
 
 type DailySummaryRepository interface {
 	Create(ctx context.Context, summary *DailySummary) error
+	Update(ctx context.Context, summary *DailySummary) error
 	FindByDate(ctx context.Context, userID, date string) (*DailySummary, error)
 	ListRecent(ctx context.Context, userID string, limit int) ([]*DailySummary, error)
 }

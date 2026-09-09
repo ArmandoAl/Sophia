@@ -61,7 +61,7 @@ func (e *DeepSeekError) ProviderErrorType() string {
 
 type Client struct {
 	apiKey     string
-	model      string
+	models     map[string]string
 	endpoint   string
 	httpClient *http.Client
 }
@@ -82,12 +82,15 @@ func WithHTTPClient(client *http.Client) Option {
 	}
 }
 
-func NewClient(apiKey, model string, opts ...Option) (*Client, error) {
+func NewClient(apiKey string, models map[string]string, opts ...Option) (*Client, error) {
 	client := &Client{
 		apiKey:     strings.TrimSpace(apiKey),
-		model:      strings.TrimSpace(model),
+		models:     make(map[string]string, len(models)),
 		endpoint:   defaultEndpoint,
 		httpClient: &http.Client{Timeout: 45 * time.Second},
+	}
+	for task, model := range models {
+		client.models[strings.TrimSpace(task)] = strings.TrimSpace(model)
 	}
 	for _, opt := range opts {
 		opt(client)
@@ -95,7 +98,7 @@ func NewClient(apiKey, model string, opts ...Option) (*Client, error) {
 	if client.apiKey == "" {
 		return nil, ErrMissingAPIKey
 	}
-	if client.model == "" {
+	if client.models[""] == "" {
 		return nil, ErrMissingModel
 	}
 	if client.endpoint == "" {
@@ -113,12 +116,19 @@ func (c *Client) Generate(ctx context.Context, request runtimedomain.ModelReques
 	if err != nil {
 		return runtimedomain.ModelResponse{}, err
 	}
-	if request.Task == runtimedomain.TaskSynthesize {
+	if request.Task == runtimedomain.TaskSynthesize || request.Task == runtimedomain.TaskExtract {
 		system = []byte(synthesisSystemPrompt())
+		if request.Task == runtimedomain.TaskExtract {
+			system = []byte("Extract only observable facts and preferences from the supplied conversations. Return JSON only with beliefs; do not infer sensitive traits.")
+		}
 		userContent = []byte(request.Message)
 	}
+	model := c.models[request.Task]
+	if model == "" {
+		model = c.models[""]
+	}
 	payload, err := json.Marshal(deepSeekRequest{
-		Model: c.model,
+		Model: model,
 		Messages: []message{
 			{Role: "system", Content: string(system)},
 			{Role: "user", Content: string(userContent)},
@@ -150,7 +160,7 @@ func (c *Client) Generate(ctx context.Context, request runtimedomain.ModelReques
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return runtimedomain.ModelResponse{}, newDeepSeekHTTPError(resp.StatusCode, body, c.apiKey)
 	}
-	return parseResponse(body, request.Task, c.model)
+	return parseResponse(body, request.Task, model)
 }
 
 func (c *Client) url() string {
@@ -184,7 +194,7 @@ func parseResponse(body []byte, task, model string) (runtimedomain.ModelResponse
 		CachedInputTokens: response.Usage.PromptCacheHitTokens,
 		Model:             model,
 	}
-	if task == runtimedomain.TaskSynthesize {
+	if task == runtimedomain.TaskSynthesize || task == runtimedomain.TaskExtract {
 		if !json.Valid([]byte(text)) {
 			return runtimedomain.ModelResponse{}, ErrInvalidDeepSeekOutput
 		}
