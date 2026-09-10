@@ -30,6 +30,10 @@ func TestEnqueueIsIdempotentAndRetireIsBatchScoped(t *testing.T) {
 	if first.ID != second.ID {
 		t.Fatalf("duplicate external id created batches %q and %q", first.ID, second.ID)
 	}
+	listed, err := service.ListBatches(ctx, "user-1")
+	if err != nil || len(listed) != 1 || listed[0].ID != first.ID {
+		t.Fatalf("ListBatches() = %#v, %v", listed, err)
+	}
 	imported, err := learning.UpsertBeliefWithTrust(ctx, "user-1", "likes mornings", learningdomain.CategoryPersonal, learningdomain.ScopeGlobal, "", learningdomain.TrustInferred, 0.5, first.ID)
 	if err != nil {
 		t.Fatal(err)

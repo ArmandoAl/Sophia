@@ -91,6 +91,28 @@ func (r *FirestorePromptVersionRepository) CreateActive(ctx context.Context, ver
 	})
 }
 
+func (r *FirestorePromptVersionRepository) DeactivateActive(ctx context.Context, userID string) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	col := r.client.Collection(promptVersionsCollection)
+	return r.client.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		iter := tx.Documents(col.Where("user_id", "==", userID).Where("active", "==", true))
+		defer iter.Stop()
+		for {
+			doc, err := iter.Next()
+			if errors.Is(err, iterator.Done) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if err := tx.Update(doc.Ref, []firestore.Update{{Path: "active", Value: false}}); err != nil {
+				return err
+			}
+		}
+	})
+}
+
 func (r *FirestorePromptVersionRepository) GetActive(ctx context.Context, userID string) (*domain.PromptVersion, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()

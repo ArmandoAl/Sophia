@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sophia_ai/core/theme/design_tokens.dart';
 import 'package:sophia_ai/core/widgets/neon_button.dart';
 import 'package:sophia_ai/core/widgets/neon_wrapper.dart';
+import 'package:sophia_ai/core/widgets/motion/motion_widgets.dart';
 import 'package:sophia_ai/features/session/presentation/cubit/session_cubit.dart';
 import 'package:sophia_ai/features/session/presentation/cubit/session_state.dart';
 
@@ -52,14 +54,20 @@ class SplashSessionScreen extends StatelessWidget {
               );
             }
 
-            return const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Starting Sophia…'),
-                ],
+            return const MotionSwap(
+              child: Center(
+                key: ValueKey('session-loading'),
+                child: SizedBox(
+                  width: SophiaSpace.xxxl * 2,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      ContentSkeleton(height: SophiaSpace.xs),
+                      SizedBox(height: SophiaSpace.md),
+                      Text('Starting Sophia…'),
+                    ],
+                  ),
+                ),
               ),
             );
           },

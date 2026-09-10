@@ -58,6 +58,7 @@ type Batch struct {
 
 type BatchRepository interface {
 	Create(ctx context.Context, batch *Batch) error
+	ListByUser(ctx context.Context, userID string) ([]*Batch, error)
 	FindByID(ctx context.Context, userID, batchID string) (*Batch, error)
 	FindByExternalID(ctx context.Context, userID, source, externalID string) (*Batch, error)
 	ClaimNext(ctx context.Context, workerID string, now, leaseUntil time.Time) (*Batch, error)

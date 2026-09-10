@@ -348,8 +348,8 @@ func TestDailySummaryIsAppendOnly(t *testing.T) {
 	if _, err := svc.CreateDailySummary(ctx, "user-1", domain.DailySummaryCreate{Date: "2026-09-07", Observations: []string{"first"}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := svc.CreateDailySummary(ctx, "user-1", domain.DailySummaryCreate{Date: "2026-09-07", Observations: []string{"overwrite"}}); err != domain.ErrDailySummaryExists {
-		t.Fatalf("expected ErrDailySummaryExists, got %v", err)
+	if _, err := svc.CreateDailySummary(ctx, "user-1", domain.DailySummaryCreate{Date: "2026-09-07", Observations: []string{"overwrite"}}); err != domain.ErrDailySummaryAlreadyExists {
+		t.Fatalf("expected ErrDailySummaryAlreadyExists, got %v", err)
 	}
 	summary, err := svc.FindDailySummary(ctx, "user-1", "2026-09-07")
 	if err != nil {

@@ -50,6 +50,10 @@ func (s *Service) Enqueue(ctx context.Context, userID string, conversations []do
 	return batch, nil
 }
 
+func (s *Service) ListBatches(ctx context.Context, userID string) ([]*domain.Batch, error) {
+	return s.batches.ListByUser(ctx, userID)
+}
+
 func (s *Service) RetireBatch(ctx context.Context, userID, batchID string) (int, error) {
 	batch, err := s.batches.FindByID(ctx, userID, batchID)
 	if err != nil {

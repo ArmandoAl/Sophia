@@ -58,7 +58,6 @@ void main() {
       expect(flags.aiRuntimeEnabled, isFalse);
       expect(flags.aiActionExecutionEnabled, isTrue);
       expect(flags.notificationsEnabled, isFalse);
-      expect(flags.privacyDeleteRequestEnabled, isFalse);
       expect(flags.smartHomeEnabled, isFalse);
     });
   });

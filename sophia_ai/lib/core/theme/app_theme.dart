@@ -1,44 +1,71 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'design_tokens.dart';
 
 class AppTheme {
-  // Colores extraídos del diseño HTML/Tailwind
-  static const _primaryColor = Color(0xFF1313EC); // Vivid Blue
-  static const _secondaryColor = Color(0xFF9333EA); // Purple-600 approx
-  static const _backgroundColor = Color(0xFF101022); // Background-dark
-  static const _surfaceColor = Color(0xFF1A1F2E);
+  static final lightTheme = _theme(Brightness.light, SophiaColors.light);
+  static final darkTheme = _theme(Brightness.dark, SophiaColors.dark);
 
-  static final ThemeData darkTheme = ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.dark,
-    scaffoldBackgroundColor: _backgroundColor, // Fondo base
-    primaryColor: _primaryColor,
-
-    // Definimos el esquema de colores
-    colorScheme: const ColorScheme.dark(
-      primary: _primaryColor,
-      secondary: _secondaryColor,
-      surface: _surfaceColor,
-      error: Color(0xFFEF476F),
-      onSurface: Colors.white,
-    ),
-
-    // Tipografía: Space Grotesk para ese look futurista del HTML
-    textTheme: GoogleFonts.spaceGroteskTextTheme(
-      ThemeData.dark().textTheme,
-    ).apply(bodyColor: Colors.white, displayColor: Colors.white),
-
-    // AppBar transparente para ver el fondo neon
-    appBarTheme: const AppBarTheme(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      centerTitle: false,
-      titleTextStyle: TextStyle(
-        fontFamily: 'Space Grotesk',
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: Colors.white,
-      ),
-    ),
-  );
+  static ThemeData _theme(Brightness brightness, SophiaColors colors) =>
+      ThemeData(
+        useMaterial3: true,
+        brightness: brightness,
+        scaffoldBackgroundColor: colors.surface,
+        colorScheme: ColorScheme(
+          brightness: brightness,
+          primary: colors.accent,
+          onPrimary: colors.surface,
+          secondary: colors.softInk,
+          onSecondary: colors.surface,
+          error: colors.critical,
+          onError: colors.surface,
+          surface: colors.elevated,
+          onSurface: colors.ink,
+        ),
+        textTheme: SophiaType.theme(colors),
+        extensions: [colors],
+        disabledColor: colors.muted,
+        shadowColor: colors.scrim.withValues(alpha: .14),
+        dividerTheme: DividerThemeData(color: colors.line, thickness: 1),
+        cardTheme: CardThemeData(
+          color: colors.elevated,
+          elevation: SophiaElevation.raised,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(SophiaRadius.card),
+          ),
+        ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: colors.surface,
+          foregroundColor: colors.ink,
+          elevation: SophiaElevation.flat,
+          centerTitle: false,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: colors.elevated,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(SophiaRadius.control),
+            borderSide: BorderSide(color: colors.line),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(SophiaRadius.control),
+            borderSide: BorderSide(color: colors.line),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(SophiaRadius.control),
+            borderSide: BorderSide(color: colors.accent, width: 2),
+          ),
+        ),
+        bottomSheetTheme: BottomSheetThemeData(
+          backgroundColor: colors.elevated,
+          modalBackgroundColor: colors.elevated,
+          modalBarrierColor: colors.scrim.withValues(alpha: .28),
+          elevation: SophiaElevation.overlay,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(SophiaRadius.sheet),
+            ),
+          ),
+        ),
+        focusColor: colors.accent.withValues(alpha: .22),
+      );
 }

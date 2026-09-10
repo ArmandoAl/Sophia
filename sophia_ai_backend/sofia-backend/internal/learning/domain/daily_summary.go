@@ -2,11 +2,18 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 )
 
 const DateLayout = "2006-01-02"
+
+var (
+	ErrDailySummaryNotFound      = errors.New("daily summary not found")
+	ErrDailySummaryAlreadyExists = errors.New("daily summary already exists for this date")
+	ErrInvalidDate               = errors.New("date must be YYYY-MM-DD")
+)
 
 type DailyDelta struct {
 	Reinforced   []string

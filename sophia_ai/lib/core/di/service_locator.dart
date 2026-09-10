@@ -6,15 +6,25 @@ import '../../features/actions/domain/action_proposals_repository.dart';
 import '../../features/auth/data/auth_repository_impl.dart';
 import '../../features/auth/domain/auth_repository.dart';
 import '../../features/auth/presentation/cubit/auth_cubit.dart';
+import '../../features/beliefs/data/beliefs_repository_impl.dart';
+import '../../features/beliefs/domain/beliefs_repository.dart';
+import '../../features/beliefs/presentation/cubit/beliefs_cubit.dart';
 import '../../features/chat/data/conversations_repository_impl.dart';
 import '../../features/chat/domain/conversations_repository.dart';
 import '../../features/chat/presentation/cubit/chat_message_cubit.dart';
+import '../../features/contexts/data/contexts_repository_impl.dart';
+import '../../features/contexts/domain/contexts_repository.dart';
+import '../../features/contexts/presentation/cubit/contexts_cubit.dart';
 import '../../features/dashboard/presentation/cubit/dashboard_cubit.dart';
 import '../../features/session/presentation/cubit/session_cubit.dart';
 import '../../features/settings/presentation/cubit/settings_cubit.dart';
+import '../../features/settings/data/settings_services_repository_impl.dart';
+import '../../features/settings/domain/settings_services_repository.dart';
+import '../../features/settings/presentation/cubit/settings_services_cubit.dart';
 import '../../features/system/data/system_repository_impl.dart';
 import '../../features/system/domain/system_repository.dart';
 import '../../features/system/presentation/cubit/health_cubit.dart';
+import '../../features/system/presentation/cubit/learning_diagnostics_cubit.dart';
 import '../../features/users/data/user_repository_impl.dart';
 import '../../features/users/domain/user_repository.dart';
 import '../../features/users/presentation/cubit/ai_settings_cubit.dart';
@@ -92,6 +102,21 @@ Future<void> initDependencies({
       () => RemindersRepositoryImpl(sl<ApiClient>()),
     );
   }
+  if (!sl.isRegistered<BeliefsRepository>()) {
+    sl.registerLazySingleton<BeliefsRepository>(
+      () => BeliefsRepositoryImpl(sl<ApiClient>()),
+    );
+  }
+  if (!sl.isRegistered<ContextsRepository>()) {
+    sl.registerLazySingleton<ContextsRepository>(
+      () => ContextsRepositoryImpl(sl<ApiClient>()),
+    );
+  }
+  if (!sl.isRegistered<SettingsServicesRepository>()) {
+    sl.registerLazySingleton<SettingsServicesRepository>(
+      () => SettingsServicesRepositoryImpl(sl<ApiClient>()),
+    );
+  }
 
   // Session is the global auth source of truth (singleton).
   if (!sl.isRegistered<SessionCubit>()) {
@@ -151,6 +176,20 @@ Future<void> initDependencies({
       () => RemindersCubit(repository: sl<RemindersRepository>()),
     );
   }
+  if (!sl.isRegistered<BeliefsCubit>()) {
+    sl.registerFactory(() => BeliefsCubit(sl<BeliefsRepository>()));
+  }
+  if (!sl.isRegistered<ContextsCubit>()) {
+    sl.registerFactory(() => ContextsCubit(sl<ContextsRepository>()));
+  }
+  if (!sl.isRegistered<LearningDiagnosticsCubit>()) {
+    sl.registerFactory(() => LearningDiagnosticsCubit(sl<BeliefsRepository>()));
+  }
+  sl.registerFactory(() => PrivacyCubit(sl<SettingsServicesRepository>()));
+  sl.registerFactory(
+    () => NotificationsCubit(sl<SettingsServicesRepository>()),
+  );
+  sl.registerFactory(() => IngestionCubit(sl<SettingsServicesRepository>()));
 
   // Legacy UI prototype cubits (not backend-backed).
   if (!sl.isRegistered<DashboardCubit>()) {

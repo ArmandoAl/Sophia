@@ -6,7 +6,6 @@ class FeatureFlags {
     this.aiRuntimeEnabled = false,
     this.aiActionExecutionEnabled = true,
     this.notificationsEnabled = false,
-    this.privacyDeleteRequestEnabled = false,
     this.smartHomeEnabled = false,
   });
 
@@ -20,9 +19,6 @@ class FeatureFlags {
   /// F5: device token / FCM registration UI.
   final bool notificationsEnabled;
 
-  /// F5+: controlled delete-request (not physical delete).
-  final bool privacyDeleteRequestEnabled;
-
   /// Out of Backend v0.1 scope — keep UI gated.
   final bool smartHomeEnabled;
 
@@ -32,7 +28,6 @@ class FeatureFlags {
     bool? aiRuntimeEnabled,
     bool? aiActionExecutionEnabled,
     bool? notificationsEnabled,
-    bool? privacyDeleteRequestEnabled,
     bool? smartHomeEnabled,
   }) {
     return FeatureFlags(
@@ -40,8 +35,6 @@ class FeatureFlags {
       aiActionExecutionEnabled:
           aiActionExecutionEnabled ?? this.aiActionExecutionEnabled,
       notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
-      privacyDeleteRequestEnabled:
-          privacyDeleteRequestEnabled ?? this.privacyDeleteRequestEnabled,
       smartHomeEnabled: smartHomeEnabled ?? this.smartHomeEnabled,
     );
   }

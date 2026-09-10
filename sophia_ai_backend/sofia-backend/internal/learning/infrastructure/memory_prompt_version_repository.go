@@ -42,6 +42,17 @@ func (r *InMemoryPromptVersionRepository) CreateActive(ctx context.Context, vers
 	return nil
 }
 
+func (r *InMemoryPromptVersionRepository) DeactivateActive(ctx context.Context, userID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, version := range r.versions {
+		if version.UserID == userID {
+			version.Active = false
+		}
+	}
+	return nil
+}
+
 func (r *InMemoryPromptVersionRepository) GetActive(ctx context.Context, userID string) (*domain.PromptVersion, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -36,6 +36,7 @@ type PromptVersionCreate struct {
 
 type PromptVersionRepository interface {
 	CreateActive(ctx context.Context, version *PromptVersion) error
+	DeactivateActive(ctx context.Context, userID string) error
 	GetActive(ctx context.Context, userID string) (*PromptVersion, error)
 	ListVersions(ctx context.Context, userID string, limit int) ([]*PromptVersion, error)
 }

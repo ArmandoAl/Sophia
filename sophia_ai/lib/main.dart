@@ -29,6 +29,8 @@ class SophiaApp extends StatelessWidget {
         title: 'SOPHIA AI',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.system,
         routerConfig: router ?? AppRouter.create(sessionCubit: sessionCubit),
       ),
     );

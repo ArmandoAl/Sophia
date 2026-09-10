@@ -36,6 +36,19 @@ func (r *InMemoryBatchRepository) Create(ctx context.Context, batch *domain.Batc
 	return nil
 }
 
+func (r *InMemoryBatchRepository) ListByUser(ctx context.Context, userID string) ([]*domain.Batch, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	batches := make([]*domain.Batch, 0)
+	for _, batch := range r.batches {
+		if batch.UserID == userID {
+			batches = append(batches, cloneBatch(batch))
+		}
+	}
+	sort.Slice(batches, func(i, j int) bool { return batches[i].CreatedAt.After(batches[j].CreatedAt) })
+	return batches, nil
+}
+
 func (r *InMemoryBatchRepository) FindByID(ctx context.Context, userID, batchID string) (*domain.Batch, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

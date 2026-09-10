@@ -53,6 +53,15 @@ func (h *Handler) Batches(w http.ResponseWriter, r *http.Request) {
 		httpjson.Unauthorized(w)
 		return
 	}
+	if r.Method == http.MethodGet && r.URL.Path == "/ingestion/batches" {
+		batches, err := h.service.ListBatches(r.Context(), userID)
+		if err != nil {
+			h.handleError(w, err)
+			return
+		}
+		httpjson.WriteJSON(w, http.StatusOK, batches)
+		return
+	}
 	if r.Method != http.MethodDelete {
 		httpjson.MethodNotAllowed(w)
 		return

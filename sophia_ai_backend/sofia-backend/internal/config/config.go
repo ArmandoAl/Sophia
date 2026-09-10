@@ -167,6 +167,9 @@ func Load() (Config, error) {
 	if cfg.PersistenceDriver == "firestore" && cfg.FirestoreProjectID == "" {
 		return Config{}, errors.New("FIRESTORE_PROJECT_ID is required when PERSISTENCE_DRIVER=firestore")
 	}
+	if cfg.PersistenceDriver == "firestore" && cfg.FirestoreDatabaseID == "" {
+		return Config{}, errors.New("FIRESTORE_DATABASE_ID is required when PERSISTENCE_DRIVER=firestore; implicit database \"(default)\" is not assumed")
+	}
 	if cfg.AIModelProvider != "fake" && cfg.AIModelProvider != "deepseek" {
 		return Config{}, errors.New("AI_MODEL_PROVIDER must be fake or deepseek")
 	}

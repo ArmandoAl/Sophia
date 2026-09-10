@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"sort"
 	"time"
 
 	"cloud.google.com/go/firestore"
@@ -49,6 +50,30 @@ func (r *FirestoreBatchRepository) Create(ctx context.Context, batch *domain.Bat
 		return domain.ErrExternalIDExists
 	}
 	return err
+}
+
+func (r *FirestoreBatchRepository) ListByUser(ctx context.Context, userID string) ([]*domain.Batch, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	iter := r.client.Collection(ingestionBatchesCollection).Where("user_id", "==", userID).Documents(ctx)
+	defer iter.Stop()
+	batches := make([]*domain.Batch, 0)
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		var batch domain.Batch
+		if err := doc.DataTo(&batch); err != nil {
+			return nil, err
+		}
+		batches = append(batches, &batch)
+	}
+	sort.Slice(batches, func(i, j int) bool { return batches[i].CreatedAt.After(batches[j].CreatedAt) })
+	return batches, nil
 }
 
 func (r *FirestoreBatchRepository) FindByID(ctx context.Context, userID, batchID string) (*domain.Batch, error) {

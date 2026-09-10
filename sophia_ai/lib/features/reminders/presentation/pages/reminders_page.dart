@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:sophia_ai/core/di/service_locator.dart';
 import 'package:sophia_ai/core/models/models.dart';
+import 'package:sophia_ai/core/theme/design_tokens.dart';
+import 'package:sophia_ai/core/widgets/motion/motion_widgets.dart';
 import 'package:sophia_ai/core/widgets/neon_wrapper.dart';
 import '../../domain/reminders_repository.dart';
 import '../cubit/reminder_detail_cubit.dart';
@@ -18,7 +21,7 @@ class RemindersPage extends StatelessWidget {
       value: cubit ?? sl<RemindersCubit>()
         ..load(),
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: context.colors.surface.withValues(alpha: 0),
         appBar: AppBar(
           title: const Text('Reminders'),
           actions: [
@@ -36,9 +39,8 @@ class RemindersPage extends StatelessWidget {
       ),
     ),
   );
-  void _openEditor(BuildContext context) => showModalBottomSheet(
+  void _openEditor(BuildContext context) => showSophiaSheet(
     context: context,
-    isScrollControlled: true,
     builder: (_) => _ReminderEditor(cubit: context.read<RemindersCubit>()),
   );
 }
@@ -50,45 +52,66 @@ class _Body extends StatelessWidget {
       BlocBuilder<RemindersCubit, RemindersState>(
         builder: (context, state) {
           if (state.isLoading && state.reminders.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const MotionSwap(
+              child: Padding(
+                key: ValueKey('reminders-loading'),
+                padding: EdgeInsets.all(SophiaSpace.lg),
+                child: Column(
+                  children: [
+                    ContentSkeleton(),
+                    SizedBox(height: SophiaSpace.md),
+                    ContentSkeleton(),
+                  ],
+                ),
+              ),
+            );
           }
           if (state.errorMessage != null && state.reminders.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    state.errorMessage!,
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  TextButton(
-                    onPressed: () => context.read<RemindersCubit>().load(),
-                    child: const Text('Reintentar'),
-                  ),
-                ],
+            return MotionSwap(
+              child: Center(
+                key: const ValueKey('reminders-error'),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      state.errorMessage!,
+                      style: const TextStyle(color: Colors.white70),
+                    ),
+                    TextButton(
+                      onPressed: () => context.read<RemindersCubit>().load(),
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
               ),
             );
           }
           if (state.reminders.isEmpty) {
-            return const Center(
-              child: Text(
-                'No tienes reminders todavía',
-                style: TextStyle(color: Colors.white70),
+            return MotionSwap(
+              child: Center(
+                key: const ValueKey('reminders-empty'),
+                child: Text(
+                  'No tienes reminders todavía',
+                  style: TextStyle(color: context.colors.softInk),
+                ),
               ),
             );
           }
-          return RefreshIndicator(
-            onRefresh: context.read<RemindersCubit>().load,
-            child: ListView(
-              padding: const EdgeInsets.all(20),
-              children: [
-                const Text(
-                  'Simple recurrence: none, daily, weekly, monthly',
-                  style: TextStyle(color: Colors.cyanAccent, fontSize: 12),
-                ),
-                const SizedBox(height: 12),
-                ...state.reminders.map((r) => _ReminderTile(r)),
-              ],
+          return MotionSwap(
+            child: RefreshIndicator(
+              key: const ValueKey('reminders-content'),
+              onRefresh: context.read<RemindersCubit>().load,
+              child: ListView(
+                padding: const EdgeInsets.all(SophiaSpace.lg),
+                children: [
+                  const Text(
+                    'Simple recurrence: none, daily, weekly, monthly',
+                    style: TextStyle(color: Colors.cyanAccent, fontSize: 12),
+                  ),
+                  const SizedBox(height: 12),
+                  ...state.reminders.map((r) => _ReminderTile(r)),
+                ],
+              ),
             ),
           );
         },
@@ -102,10 +125,7 @@ class _ReminderTile extends StatelessWidget {
   Widget build(BuildContext context) => Card(
     color: const Color(0xFF151B24),
     child: ListTile(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ReminderDetailPage(id: reminder.id)),
-      ),
+      onTap: () => context.push('/reminders/${reminder.id}'),
       title: Text(reminder.title, style: const TextStyle(color: Colors.white)),
       subtitle: Text(
         '${_when(reminder.scheduledAt)} · ${reminder.recurrenceRule.name}',
@@ -138,7 +158,13 @@ class ReminderDetailPage extends StatelessWidget {
       body: BlocBuilder<ReminderDetailCubit, ReminderDetailState>(
         builder: (_, s) {
           if (s.loading) {
-            return const Center(child: CircularProgressIndicator());
+            return const MotionSwap(
+              child: Padding(
+                key: ValueKey('reminder-detail-loading'),
+                padding: EdgeInsets.all(SophiaSpace.lg),
+                child: ContentSkeleton(height: 180),
+              ),
+            );
           }
           if (s.error != null) return Center(child: Text(s.error!));
           final r = s.reminder!;

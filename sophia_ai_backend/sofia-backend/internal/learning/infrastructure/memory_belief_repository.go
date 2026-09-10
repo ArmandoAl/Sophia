@@ -47,6 +47,21 @@ func (r *InMemoryBeliefRepository) FindByID(ctx context.Context, userID, beliefI
 	return cloneBelief(belief), nil
 }
 
+func (r *InMemoryBeliefRepository) List(ctx context.Context, userID string, limit int) ([]*domain.Belief, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := make([]*domain.Belief, 0)
+	for _, belief := range r.beliefs {
+		if belief.UserID == userID {
+			result = append(result, cloneBelief(belief))
+		}
+	}
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
+}
+
 func (r *InMemoryBeliefRepository) ListActive(ctx context.Context, userID string, limit int) ([]*domain.Belief, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()

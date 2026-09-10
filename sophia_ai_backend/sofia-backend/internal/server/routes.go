@@ -64,6 +64,11 @@ func (r Routes) Handler() http.Handler {
 	mux.Handle("/memory/", r.Authn(http.HandlerFunc(r.Memory.Resource)))
 	mux.Handle("/contexts", r.Authn(http.HandlerFunc(r.Contexts.Collection)))
 	mux.Handle("/contexts/", r.Authn(http.HandlerFunc(r.Contexts.Resource)))
+	mux.Handle("/learning/beliefs", r.Authn(http.HandlerFunc(r.Contexts.Beliefs)))
+	mux.Handle("/learning/beliefs/", r.Authn(http.HandlerFunc(r.Contexts.BeliefResource)))
+	mux.Handle("/learning/prompt-version", r.Authn(http.HandlerFunc(r.Contexts.PromptVersion)))
+	mux.Handle("/learning/summaries", r.Authn(http.HandlerFunc(r.Contexts.Summaries)))
+	mux.Handle("/learning/summaries/", r.Authn(http.HandlerFunc(r.Contexts.SummaryResource)))
 	mux.Handle("/notifications/device-tokens", r.Authn(http.HandlerFunc(r.Notifications.Collection)))
 	mux.Handle("/notifications/device-tokens/", r.Authn(http.HandlerFunc(r.Notifications.Resource)))
 	mux.Handle("/tools", r.Authn(http.HandlerFunc(r.Tools.Collection)))
@@ -74,6 +79,7 @@ func (r Routes) Handler() http.Handler {
 	mux.Handle("/conversations", r.Authn(http.HandlerFunc(r.Conversations.Collection)))
 	mux.Handle("/conversations/", r.Authn(http.HandlerFunc(r.Conversations.Resource)))
 	mux.Handle("/ingestion/conversations", r.Authn(http.HandlerFunc(r.Ingestion.Conversations)))
+	mux.Handle("/ingestion/batches", r.Authn(http.HandlerFunc(r.Ingestion.Batches)))
 	mux.Handle("/ingestion/batches/", r.Authn(http.HandlerFunc(r.Ingestion.Batches)))
 	return mux
 }

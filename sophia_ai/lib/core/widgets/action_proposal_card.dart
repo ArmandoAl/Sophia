@@ -1,7 +1,9 @@
 import 'dart:convert';
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../theme/design_tokens.dart';
+import 'motion/motion_widgets.dart';
 
 class ProposedAction {
   final String id;
@@ -16,7 +18,7 @@ class ProposedAction {
     required this.icon,
     required this.label,
     required this.detail,
-    this.color = Colors.cyan,
+    required this.color,
     this.proposedInput = const <String, dynamic>{},
   });
 }
@@ -40,6 +42,7 @@ class ActionProposalCard extends StatefulWidget {
   final List<ProposedAction> actions;
   final ConfirmProposedAction? onConfirm;
   final RejectProposedAction? onReject;
+  final Object? heroTag;
 
   const ActionProposalCard({
     super.key,
@@ -47,6 +50,7 @@ class ActionProposalCard extends StatefulWidget {
     required this.actions,
     this.onConfirm,
     this.onReject,
+    this.heroTag,
   });
 
   @override
@@ -78,46 +82,21 @@ class _ActionProposalCardState extends State<ActionProposalCard> {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: const Color(
-              0xFF151B24,
-            ).withValues(alpha: 0.8), // Glassmorphism
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF2E5CB8).withValues(alpha: 0.1),
-                blurRadius: 15,
-                offset: const Offset(0, 5),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              ...widget.actions.map(_buildActionBlock),
-            ],
-          ),
-        ),
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: SophiaSpace.xs),
+      padding: const EdgeInsets.all(SophiaSpace.lg),
+      decoration: BoxDecoration(
+        color: context.colors.elevated,
+        borderRadius: BorderRadius.circular(SophiaRadius.card),
+        border: Border.all(color: context.colors.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(widget.title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: SophiaSpace.lg),
+          ...widget.actions.map(_buildActionBlock),
+        ],
       ),
     );
   }
@@ -125,19 +104,34 @@ class _ActionProposalCardState extends State<ActionProposalCard> {
   Widget _buildActionBlock(ProposedAction action) {
     final resolved = _resolved[action.id];
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: SophiaSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildActionItem(action),
-          const SizedBox(height: 12),
-          if (resolved != null)
-            Text(
-              resolved,
-              style: TextStyle(color: Colors.grey[400], fontSize: 12),
-            )
-          else
-            _buildActionButtons(action),
+          const SizedBox(height: SophiaSpace.sm),
+          MotionSwap(
+            child: resolved != null
+                ? Row(
+                    key: ValueKey(resolved),
+                    children: [
+                      Icon(
+                        Icons.check,
+                        size: SophiaSpace.md,
+                        color: context.colors.positive,
+                      ),
+                      const SizedBox(width: SophiaSpace.xs),
+                      Text(
+                        resolved,
+                        style: TextStyle(color: context.colors.softInk),
+                      ),
+                    ],
+                  )
+                : KeyedSubtree(
+                    key: const ValueKey('actions'),
+                    child: _buildActionButtons(action),
+                  ),
+          ),
         ],
       ),
     );
@@ -147,30 +141,30 @@ class _ActionProposalCardState extends State<ActionProposalCard> {
     return Row(
       children: [
         Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(SophiaSpace.sm),
           decoration: BoxDecoration(
-            color: action.color.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(12),
+            color: action.color.withValues(alpha: SophiaOpacity.subtle),
+            borderRadius: BorderRadius.circular(SophiaRadius.control),
           ),
-          child: Icon(action.icon, color: action.color, size: 24),
+          child: Icon(action.icon, color: action.color, size: SophiaSpace.lg),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: SophiaSpace.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 action.label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: SophiaSpace.xxs),
               Text(
                 action.detail,
-                style: TextStyle(color: Colors.grey[400], fontSize: 13),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: context.colors.softInk),
               ),
             ],
           ),
@@ -184,56 +178,75 @@ class _ActionProposalCardState extends State<ActionProposalCard> {
     return Row(
       children: [
         Expanded(
-          child: OutlinedButton(
+          child: TactileButton(
+            haptics: false,
             onPressed: busy ? null : () => _reject(action),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white70,
-              side: const BorderSide(color: Colors.white24),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            child: IgnorePointer(
+              child: OutlinedButton(
+                onPressed: busy ? null : () {},
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: context.colors.softInk,
+                  side: BorderSide(color: context.colors.line),
+                  padding: const EdgeInsets.symmetric(vertical: SophiaSpace.sm),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(SophiaRadius.control),
+                  ),
+                ),
+                child: Text(
+                  'No',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
               ),
-            ),
-            child: const Text(
-              'No',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: SophiaSpace.xs),
         Expanded(
-          child: OutlinedButton(
+          child: TactileButton(
             onPressed: busy ? null : () => _adjust(action),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: const BorderSide(color: Colors.white24),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            child: IgnorePointer(
+              child: OutlinedButton(
+                onPressed: busy ? null : () {},
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: context.colors.ink,
+                  side: BorderSide(color: context.colors.line),
+                  padding: const EdgeInsets.symmetric(vertical: SophiaSpace.sm),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(SophiaRadius.control),
+                  ),
+                ),
+                child: Text(
+                  'Ajustar',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
               ),
-            ),
-            child: const Text(
-              'Ajustar',
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
             ),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: SophiaSpace.xs),
         Expanded(
-          child: ElevatedButton(
+          child: TactileButton(
+            haptics: false,
             onPressed: busy ? null : () => _confirmDirect(action),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF00D9A5),
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+            child: IgnorePointer(
+              child: ElevatedButton(
+                onPressed: busy ? null : () {},
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: context.colors.accent,
+                  foregroundColor: context.colors.surface,
+                  padding: const EdgeInsets.symmetric(vertical: SophiaSpace.sm),
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(SophiaRadius.control),
+                  ),
+                ),
+                child: Text(
+                  'Hacerlo',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: context.colors.surface,
+                  ),
+                ),
               ),
-            ),
-            child: const Text(
-              'Hacerlo',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ),
         ),
@@ -242,6 +255,7 @@ class _ActionProposalCardState extends State<ActionProposalCard> {
   }
 
   Future<void> _confirmDirect(ProposedAction action) {
+    HapticFeedback.mediumImpact();
     return _run(action, () async {
       await widget.onConfirm?.call(
         action,
@@ -251,9 +265,10 @@ class _ActionProposalCardState extends State<ActionProposalCard> {
   }
 
   Future<void> _adjust(ProposedAction action) async {
-    final corrected = await showDialog<Map<String, dynamic>>(
+    final corrected = await showSophiaSheet<Map<String, dynamic>>(
       context: context,
-      builder: (context) => _AdjustProposalDialog(action: action),
+      builder: (context) =>
+          _AdjustProposalDialog(action: action, heroTag: widget.heroTag),
     );
     if (corrected == null || !mounted) return;
     await _run(action, () async {
@@ -266,36 +281,33 @@ class _ActionProposalCardState extends State<ActionProposalCard> {
   }
 
   Future<void> _reject(ProposedAction action) async {
-    final reason = await showModalBottomSheet<String>(
+    HapticFeedback.lightImpact();
+    final reason = await showSophiaSheet<String>(
       context: context,
-      backgroundColor: const Color(0xFF151B24),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (context) {
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: const EdgeInsets.fromLTRB(
+              SophiaSpace.md,
+              SophiaSpace.sm,
+              SophiaSpace.md,
+              SophiaSpace.lg,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '¿Por qué no?',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: SophiaSpace.sm),
                 for (final option in _rejectionOptions)
-                  ListTile(
-                    title: Text(
-                      option.$2,
-                      style: const TextStyle(color: Colors.white),
+                  TactileButton(
+                    onPressed: () => Navigator.of(context).pop(option.$1),
+                    child: IgnorePointer(
+                      child: ListTile(title: Text(option.$2), onTap: () {}),
                     ),
-                    onTap: () => Navigator.of(context).pop(option.$1),
                   ),
               ],
             ),
@@ -334,9 +346,10 @@ class _ActionProposalCardState extends State<ActionProposalCard> {
 }
 
 class _AdjustProposalDialog extends StatefulWidget {
-  const _AdjustProposalDialog({required this.action});
+  const _AdjustProposalDialog({required this.action, required this.heroTag});
 
   final ProposedAction action;
+  final Object? heroTag;
 
   @override
   State<_AdjustProposalDialog> createState() => _AdjustProposalDialogState();
@@ -364,35 +377,41 @@ class _AdjustProposalDialogState extends State<_AdjustProposalDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: const Color(0xFF151B24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text(
+    final dialog = AlertDialog(
+      backgroundColor: context.colors.elevated,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(SophiaRadius.sheet),
+      ),
+      title: Text(
         'Ajustar propuesta',
-        style: TextStyle(color: Colors.white),
+        style: TextStyle(color: context.colors.ink),
       ),
       content: SizedBox(
-        width: 360,
+        width: SophiaSize.messageMaxWidth,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               for (final entry in _controllers.entries)
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: SophiaSpace.sm),
                   child: TextField(
                     controller: entry.value,
-                    style: const TextStyle(color: Colors.white),
+                    style: TextStyle(color: context.colors.ink),
                     decoration: InputDecoration(
                       labelText: entry.key,
-                      labelStyle: const TextStyle(color: Colors.white70),
+                      labelStyle: TextStyle(color: context.colors.softInk),
                       enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Colors.white24),
+                        borderRadius: BorderRadius.circular(
+                          SophiaRadius.control,
+                        ),
+                        borderSide: BorderSide(color: context.colors.line),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: const BorderSide(color: Color(0xFF00D9A5)),
+                        borderRadius: BorderRadius.circular(
+                          SophiaRadius.control,
+                        ),
+                        borderSide: BorderSide(color: context.colors.accent),
                       ),
                     ),
                   ),
@@ -402,14 +421,19 @@ class _AdjustProposalDialogState extends State<_AdjustProposalDialog> {
         ),
       ),
       actions: [
-        TextButton(
+        TactileButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text(
-            'Cancelar',
-            style: TextStyle(color: Colors.white70),
+          child: IgnorePointer(
+            child: TextButton(
+              onPressed: () {},
+              child: Text(
+                'Cancelar',
+                style: TextStyle(color: context.colors.softInk),
+              ),
+            ),
           ),
         ),
-        ElevatedButton(
+        TactileButton(
           onPressed: () {
             final corrected = <String, dynamic>{};
             for (final entry in widget.action.proposedInput.entries) {
@@ -420,13 +444,27 @@ class _AdjustProposalDialogState extends State<_AdjustProposalDialog> {
             }
             Navigator.of(context).pop(corrected);
           },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF00D9A5),
-            foregroundColor: Colors.black,
+          child: IgnorePointer(
+            child: ElevatedButton(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: context.colors.accent,
+                foregroundColor: context.colors.surface,
+              ),
+              child: const Text('Guardar'),
+            ),
           ),
-          child: const Text('Guardar'),
         ),
       ],
+    );
+    if (widget.heroTag == null) return dialog;
+    return Hero(
+      tag: widget.heroTag!,
+      transitionOnUserGestures: true,
+      child: Material(
+        color: context.colors.surface.withValues(alpha: 0),
+        child: dialog,
+      ),
     );
   }
 

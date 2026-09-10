@@ -127,13 +127,17 @@ func (r *FirestoreMemoryRepository) DeleteSoft(ctx context.Context, userID, memo
 }
 
 func (r *FirestoreMemoryRepository) SearchBasic(ctx context.Context, filter domain.SearchFilter) ([]*domain.Memory, error) {
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = domain.DefaultSearchLimit()
+	}
 	listFilter := domain.ListFilter{
 		UserID:     filter.UserID,
 		Type:       filter.Type,
 		Tag:        filter.Tag,
 		Importance: filter.Importance,
 		Status:     domain.StatusActive,
-		Limit:      filter.Limit,
+		Limit:      limit,
 	}
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()
@@ -147,6 +151,7 @@ func (r *FirestoreMemoryRepository) SearchBasic(ctx context.Context, filter doma
 	if filter.Importance != "" {
 		query = query.Where("importance", "==", filter.Importance)
 	}
+	query = query.Limit(limit)
 	memories, err := r.collect(ctx, query, listFilter)
 	if err != nil {
 		return nil, err

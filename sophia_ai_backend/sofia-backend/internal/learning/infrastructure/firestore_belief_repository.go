@@ -84,6 +84,16 @@ func (r *FirestoreBeliefRepository) FindByID(ctx context.Context, userID, belief
 	return belief, nil
 }
 
+func (r *FirestoreBeliefRepository) List(ctx context.Context, userID string, limit int) ([]*domain.Belief, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	query := r.client.Collection(userBeliefsCollection).Where("user_id", "==", userID)
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	return r.collect(ctx, query)
+}
+
 func (r *FirestoreBeliefRepository) ListActive(ctx context.Context, userID string, limit int) ([]*domain.Belief, error) {
 	ctx, cancel := context.WithTimeout(ctx, r.timeout)
 	defer cancel()

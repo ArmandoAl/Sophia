@@ -47,23 +47,19 @@ const (
 )
 
 var (
-	ErrBeliefNotFound            = errors.New("belief not found")
-	ErrInvalidStatement          = errors.New("statement is required")
-	ErrInvalidCategory           = errors.New("invalid belief category")
-	ErrInvalidStatus             = errors.New("invalid belief status")
-	ErrInvalidPromptSlot         = errors.New("invalid prompt slot")
-	ErrInvalidSupersede          = errors.New("supersede target is required")
-	ErrBeliefNotActive           = errors.New("belief is not active")
-	ErrInvalidConfidence         = errors.New("confidence must be between 0 and 1")
-	ErrInvalidScope              = errors.New("invalid belief scope")
-	ErrInvalidScopeKey           = errors.New("invalid belief scope key")
-	ErrInvalidTrustTier          = errors.New("invalid belief trust tier")
-	ErrPromptVersionNotFound     = errors.New("prompt version not found")
-	ErrInvalidPromptContent      = errors.New("prompt content is required")
-	ErrDailySummaryNotFound      = errors.New("daily summary not found")
-	ErrDailySummaryAlreadyExists = errors.New("daily summary already exists for this date")
-	ErrDailySummaryExists        = ErrDailySummaryAlreadyExists
-	ErrInvalidDate               = errors.New("date must be YYYY-MM-DD")
+	ErrBeliefNotFound        = errors.New("belief not found")
+	ErrInvalidStatement      = errors.New("statement is required")
+	ErrInvalidCategory       = errors.New("invalid belief category")
+	ErrInvalidStatus         = errors.New("invalid belief status")
+	ErrInvalidPromptSlot     = errors.New("invalid prompt slot")
+	ErrInvalidSupersede      = errors.New("supersede target is required")
+	ErrBeliefNotActive       = errors.New("belief is not active")
+	ErrInvalidConfidence     = errors.New("confidence must be between 0 and 1")
+	ErrInvalidScope          = errors.New("invalid belief scope")
+	ErrInvalidScopeKey       = errors.New("invalid belief scope key")
+	ErrInvalidTrustTier      = errors.New("invalid belief trust tier")
+	ErrPromptVersionNotFound = errors.New("prompt version not found")
+	ErrInvalidPromptContent  = errors.New("prompt content is required")
 )
 
 type Belief struct {
@@ -103,6 +99,7 @@ type BeliefCreate struct {
 type BeliefRepository interface {
 	Create(ctx context.Context, belief *Belief) error
 	Update(ctx context.Context, belief *Belief) error
+	List(ctx context.Context, userID string, limit int) ([]*Belief, error)
 	FindByID(ctx context.Context, userID, beliefID string) (*Belief, error)
 	ListActive(ctx context.Context, userID string, limit int) ([]*Belief, error)
 	ListActiveByScope(ctx context.Context, userID, scope, scopeKey string, limit int) ([]*Belief, error)
@@ -231,6 +228,16 @@ func (b *Belief) EffectiveTrustTier() int {
 
 func (b *Belief) SetInitialConfidence(confidence float64) {
 	b.Confidence = math.Min(clamp01(confidence), trustCeiling(b.EffectiveTrustTier()))
+}
+
+func (b *Belief) UpdateStatement(statement string) error {
+	statement = strings.TrimSpace(statement)
+	if statement == "" {
+		return ErrInvalidStatement
+	}
+	b.Statement = statement
+	b.refreshDerived()
+	return nil
 }
 
 func (b *Belief) refreshDerived() {

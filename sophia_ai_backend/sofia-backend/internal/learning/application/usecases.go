@@ -14,6 +14,21 @@ import (
 
 const recompileListLimit = 1000
 
+type BeliefListFilter struct {
+	Scope, ScopeKey, Category, PromptSlot, Status, Cursor string
+	TrustTier, Limit                                      int
+}
+
+type BeliefPage struct {
+	Beliefs    []*domain.Belief
+	NextCursor string
+}
+
+type SummaryPage struct {
+	Summaries  []*domain.DailySummary
+	NextCursor string
+}
+
 type Service struct {
 	beliefs         domain.BeliefRepository
 	prompts         domain.PromptVersionRepository
@@ -194,6 +209,83 @@ func (s *Service) ListActiveBeliefs(ctx context.Context, userID string, limit in
 	return s.beliefs.ListActive(ctx, userID, limit)
 }
 
+func (s *Service) ListBeliefs(ctx context.Context, userID string, filter BeliefListFilter) (BeliefPage, error) {
+	beliefs, err := s.beliefs.List(ctx, userID, 0)
+	if err != nil {
+		return BeliefPage{}, err
+	}
+	filtered := beliefs[:0]
+	for _, belief := range beliefs {
+		if filter.Scope != "" && belief.EffectiveScope() != filter.Scope || filter.ScopeKey != "" && belief.ScopeKey != filter.ScopeKey || filter.Category != "" && belief.Category != filter.Category || filter.TrustTier != 0 && belief.EffectiveTrustTier() != filter.TrustTier || filter.PromptSlot != "" && belief.PromptSlot != filter.PromptSlot || filter.Status != "" && belief.Status != filter.Status {
+			continue
+		}
+		filtered = append(filtered, belief)
+	}
+	now := time.Now().UTC()
+	sort.SliceStable(filtered, func(i, j int) bool {
+		left, right := filtered[i].PromptValue(now), filtered[j].PromptValue(now)
+		if left == right {
+			return filtered[i].ID < filtered[j].ID
+		}
+		return left > right
+	})
+	start := 0
+	if filter.Cursor != "" {
+		for i, belief := range filtered {
+			if belief.ID == filter.Cursor {
+				start = i + 1
+				break
+			}
+		}
+	}
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = domain.DefaultListLimit()
+	}
+	end := min(start+limit, len(filtered))
+	page := BeliefPage{Beliefs: filtered[start:end]}
+	if end < len(filtered) && end > start {
+		page.NextCursor = filtered[end-1].ID
+	}
+	return page, nil
+}
+
+func (s *Service) UpdateBeliefStatement(ctx context.Context, userID, beliefID, statement string) (*domain.Belief, error) {
+	belief, err := s.GetBelief(ctx, userID, beliefID)
+	if err != nil {
+		return nil, err
+	}
+	if err := belief.UpdateStatement(statement); err != nil {
+		return nil, err
+	}
+	belief.Embedding = s.embedStatement(ctx, userID, belief.Statement)
+	if err := s.beliefs.Update(ctx, belief); err != nil {
+		return nil, err
+	}
+	s.recordBeliefAudit(ctx, userID, "belief_edited", belief.ID)
+	return belief, nil
+}
+
+func (s *Service) RetireBelief(ctx context.Context, userID, beliefID string) (*domain.Belief, error) {
+	belief, err := s.GetBelief(ctx, userID, beliefID)
+	if err != nil {
+		return nil, err
+	}
+	belief.Status = domain.StatusRetired
+	belief.PromptSlot = domain.PromptSlotSituational
+	if err := s.beliefs.Update(ctx, belief); err != nil {
+		return nil, err
+	}
+	s.recordBeliefAudit(ctx, userID, "belief_retired", belief.ID)
+	return belief, nil
+}
+
+func (s *Service) recordBeliefAudit(ctx context.Context, userID, action, beliefID string) {
+	if s.audit != nil {
+		_ = s.audit.RecordAuditLog(ctx, userID, action, "belief", beliefID, nil)
+	}
+}
+
 func (s *Service) ReinforceBelief(ctx context.Context, userID, beliefID string) (*domain.Belief, error) {
 	belief, err := s.GetBelief(ctx, userID, beliefID)
 	if err != nil {
@@ -296,6 +388,10 @@ func (s *Service) UpdateDailySummary(ctx context.Context, summary *domain.DailyS
 }
 
 func (s *Service) FindDailySummary(ctx context.Context, userID, date string) (*domain.DailySummary, error) {
+	date = strings.TrimSpace(date)
+	if _, err := time.Parse(domain.DateLayout, date); err != nil {
+		return nil, domain.ErrInvalidDate
+	}
 	summary, err := s.summaries.FindByDate(ctx, userID, date)
 	if err != nil {
 		return nil, err
@@ -311,6 +407,31 @@ func (s *Service) ListRecentDailySummaries(ctx context.Context, userID string, l
 		limit = domain.DefaultListLimit()
 	}
 	return s.summaries.ListRecent(ctx, userID, limit)
+}
+
+func (s *Service) ListDailySummariesPage(ctx context.Context, userID string, limit int, cursor string) (SummaryPage, error) {
+	values, err := s.summaries.ListRecent(ctx, userID, recompileListLimit)
+	if err != nil {
+		return SummaryPage{}, err
+	}
+	start := 0
+	if cursor != "" {
+		for i, value := range values {
+			if value.Date == cursor || value.ID == cursor {
+				start = i + 1
+				break
+			}
+		}
+	}
+	if limit <= 0 {
+		limit = domain.DefaultListLimit()
+	}
+	end := min(start+limit, len(values))
+	page := SummaryPage{Summaries: values[start:end]}
+	if end < len(values) && end > 0 {
+		page.NextCursor = values[end-1].Date
+	}
+	return page, nil
 }
 
 func (s *Service) SearchBeliefs(ctx context.Context, userID string, terms []string, limit int) ([]*domain.Belief, error) {
@@ -368,7 +489,7 @@ func (s *Service) RecompilePromptBaseFromSummary(ctx context.Context, userID, su
 		}
 	}
 	if len(coreLines) == 0 {
-		return nil, nil
+		return nil, s.prompts.DeactivateActive(ctx, userID)
 	}
 	content := strings.Join(coreLines, "\n")
 	return s.CreateActivePromptVersion(ctx, userID, domain.PromptVersionCreate{

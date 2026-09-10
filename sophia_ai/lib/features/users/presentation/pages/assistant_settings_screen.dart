@@ -136,6 +136,7 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
                         ),
                       ),
                       DropdownButtonFormField<ProactivityLevel>(
+                        isExpanded: true,
                         key: ValueKey('proactivity_${_proactivity.value}'),
                         initialValue: _proactivity,
                         decoration: const InputDecoration(
@@ -154,6 +155,7 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
                             : (v) => setState(() => _proactivity = v!),
                       ),
                       DropdownButtonFormField<AutonomyLevel>(
+                        isExpanded: true,
                         key: ValueKey('autonomy_${_autonomy.value}'),
                         initialValue: _autonomy,
                         decoration: const InputDecoration(

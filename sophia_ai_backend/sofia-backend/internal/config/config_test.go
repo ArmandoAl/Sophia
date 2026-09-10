@@ -1,6 +1,7 @@
 package config
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -99,6 +100,19 @@ func TestLoadFirestoreDatabaseID(t *testing.T) {
 
 	if cfg.FirestoreDatabaseID != "default" {
 		t.Fatalf("expected Firestore database ID default, got %q", cfg.FirestoreDatabaseID)
+	}
+}
+
+func TestLoadFirestoreRequiresDatabaseID(t *testing.T) {
+	t.Setenv("ENV", "development")
+	t.Setenv("JWT_SECRET", "local-secret")
+	t.Setenv("PERSISTENCE_DRIVER", "firestore")
+	t.Setenv("FIRESTORE_PROJECT_ID", "sofia-local")
+	t.Setenv("FIRESTORE_DATABASE_ID", "")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), `FIRESTORE_DATABASE_ID is required`) || !strings.Contains(err.Error(), `"(default)" is not assumed`) {
+		t.Fatalf("expected explicit named database error, got %v", err)
 	}
 }
 
