@@ -99,6 +99,9 @@ type Options struct {
 	WorkerID      string
 	LeaseDuration time.Duration
 	RunHourLocal  int
+	// IgnoreRunHour omite el gate de hora. Para ejecuciones disparadas por un
+	// scheduler externo: la invocación ya es la señal de que es el momento.
+	IgnoreRunHour bool
 	Now           func() time.Time
 	Logger        *log.Logger
 }
@@ -197,7 +200,7 @@ func (w *Worker) RunOnce(ctx context.Context) (RunResult, error) {
 		}
 		loc := w.userLocation(userID)
 		now := w.options.Now().In(loc)
-		if now.Hour() != w.options.RunHourLocal {
+		if !w.options.IgnoreRunHour && now.Hour() != w.options.RunHourLocal {
 			result.Skipped++
 			continue
 		}

@@ -484,3 +484,28 @@ func (a auditAdapter) RecordAuditLog(ctx context.Context, userID, action, resour
 		Metadata:     metadata,
 	})
 }
+
+// Un Cloud Run Job disparado por el scheduler ya es la señal de que es la hora:
+// con IgnoreRunHour el worker no debe saltar usuarios aunque no sea RunHourLocal.
+func TestRunOnceIgnoreRunHourProcessesOutsideWindow(t *testing.T) {
+	env := newWorkerTestEnv(t)
+	env.worker.options.RunHourLocal = 4
+	env.worker.options.Now = func() time.Time { return time.Date(2026, 9, 11, 9, 30, 0, 0, time.UTC) }
+
+	gated, err := env.worker.RunOnce(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gated.Skipped != 1 || gated.Processed != 0 {
+		t.Fatalf("fuera de hora sin flag: skipped=%d processed=%d, want 1/0", gated.Skipped, gated.Processed)
+	}
+
+	env.worker.options.IgnoreRunHour = true
+	forced, err := env.worker.RunOnce(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if forced.Skipped != 0 {
+		t.Fatalf("con IgnoreRunHour no debe saltar: skipped=%d", forced.Skipped)
+	}
+}

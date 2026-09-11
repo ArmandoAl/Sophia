@@ -8,7 +8,9 @@ class AppConfig {
     this.requestTimeout = defaultTimeout,
   });
 
-  static const String defaultBaseUrl = 'http://localhost:8080';
+  // Producción por defecto: un build sin --dart-define apunta a la API real.
+  // Para desarrollo local: --dart-define=SOFIA_API_BASE_URL=http://localhost:8080
+  static const String defaultBaseUrl = 'https://sofia-backend-m737njuj6q-uc.a.run.app';
   static const Duration defaultTimeout = Duration(seconds: 30);
   static const String baseUrlDefineKey = 'SOFIA_API_BASE_URL';
 

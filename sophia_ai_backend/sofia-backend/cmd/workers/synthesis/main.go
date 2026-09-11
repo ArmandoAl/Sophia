@@ -57,11 +57,18 @@ func main() {
 		WorkerID:      cfg.SynthesisWorkerID,
 		LeaseDuration: cfg.SynthesisWorkerLease,
 		RunHourLocal:  cfg.SynthesisRunHourLocal,
+		IgnoreRunHour: cfg.SynthesisRunOnce,
 		Logger:        logger,
 	})
 
-	logger.Printf("started env=%s persistence=%s worker_id=%s interval=%s lease_duration=%s run_hour_local=%d provider=%s", cfg.Env, cfg.PersistenceDriver, cfg.SynthesisWorkerID, cfg.SynthesisWorkerInterval, cfg.SynthesisWorkerLease, cfg.SynthesisRunHourLocal, cfg.AIModelProvider)
+	logger.Printf("started env=%s persistence=%s worker_id=%s interval=%s lease_duration=%s run_hour_local=%d run_once=%t provider=%s", cfg.Env, cfg.PersistenceDriver, cfg.SynthesisWorkerID, cfg.SynthesisWorkerInterval, cfg.SynthesisWorkerLease, cfg.SynthesisRunHourLocal, cfg.SynthesisRunOnce, cfg.AIModelProvider)
 	runOnce(ctx, logger, runner)
+
+	// Como Cloud Run Job: una pasada y salir con 0. El scheduler decide cuando.
+	if cfg.SynthesisRunOnce {
+		logger.Printf("run once complete, exiting")
+		return
+	}
 
 	ticker := time.NewTicker(cfg.SynthesisWorkerInterval)
 	defer ticker.Stop()

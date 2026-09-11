@@ -71,6 +71,7 @@
 | `SYNTHESIS_WORKER_ID` | host-derived | no | Stable worker identity used for synthesis leases. |
 | `SYNTHESIS_WORKER_INTERVAL` | `1m` | no | Poll interval as a positive Go duration. |
 | `SYNTHESIS_WORKER_LEASE` | `2m` | no | Lease duration for one daily synthesis run. |
+| `SYNTHESIS_RUN_ONCE` | `false` | Una pasada y salir (modo Cloud Run Job). Ignora el gate de hora. |
 | `SYNTHESIS_RUN_HOUR_LOCAL` | `3` | no | Local hour, from 0 through 23, when daily synthesis runs. |
 | `ENTITY_PROMOTION_THRESHOLD` | `3` | no | Mentions required before a candidate is promoted to a pending-review person. |
 

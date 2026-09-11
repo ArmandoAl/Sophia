@@ -135,12 +135,17 @@ de `config.Load()` la nombra.
 Se ejecuta a demanda y muere. **Nunca lo despliegues como Service**: correría 24/7 y
 costaría.
 
+`SYNTHESIS_RUN_ONCE=true` es lo que lo convierte en job: una pasada y sale con 0. Sin
+ella entra en bucle de ticker cada minuto y Cloud Run lo mata a los 15 min reportando
+fallo. En modo run-once también ignora el gate de hora: la invocación del scheduler ya
+es la señal de que es el momento.
+
 ```bash
 gcloud run jobs create sofia-synthesis \
   --project $P --region $R \
   --image gcr.io/$P/sofia-synthesis:latest \
   --service-account $SA \
-  --set-env-vars=ENV=production,PERSISTENCE_DRIVER=firestore,FIRESTORE_PROJECT_ID=$P,FIRESTORE_DATABASE_ID=default,GOOGLE_CLOUD_PROJECT=$P,SYNTHESIS_WORKER_ENABLED=true,AI_MODEL_PROVIDER=deepseek,DEEPSEEK_MODEL=deepseek-v4-pro,EMBEDDINGS_ENABLED=true,EMBEDDINGS_MODEL=text-embedding-004,SYNTHESIS_RUN_HOUR_LOCAL=4 \
+  --set-env-vars=ENV=production,PERSISTENCE_DRIVER=firestore,FIRESTORE_PROJECT_ID=$P,FIRESTORE_DATABASE_ID=default,GOOGLE_CLOUD_PROJECT=$P,SYNTHESIS_WORKER_ENABLED=true,SYNTHESIS_RUN_ONCE=true,AI_MODEL_PROVIDER=deepseek,DEEPSEEK_MODEL=deepseek-v4-pro,EMBEDDINGS_ENABLED=true,EMBEDDINGS_MODEL=text-embedding-004,SYNTHESIS_RUN_HOUR_LOCAL=4 \
   --set-secrets=DEEPSEEK_API_KEY=deepseek-api-key:latest,JWT_SECRET=sofia-jwt-secret:latest \
   --max-retries=1 --task-timeout=15m
 ```

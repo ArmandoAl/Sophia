@@ -86,6 +86,7 @@ type Config struct {
 	SynthesisWorkerInterval    time.Duration
 	SynthesisWorkerLease       time.Duration
 	SynthesisRunHourLocal      int
+	SynthesisRunOnce           bool
 	AutonomyThreshold          float64
 	IngestionMaxTokensPerBatch int
 	EntityPromotionThreshold   int
@@ -151,6 +152,7 @@ func Load() (Config, error) {
 		SynthesisWorkerInterval:    defaultSynthesisInterval,
 		SynthesisWorkerLease:       defaultSynthesisLease,
 		SynthesisRunHourLocal:      defaultSynthesisRunHour,
+		SynthesisRunOnce:           boolEnv("SYNTHESIS_RUN_ONCE", false),
 		AutonomyThreshold:          defaultAutonomyThreshold,
 		IngestionMaxTokensPerBatch: defaultIngestionMaxTokens,
 		EntityPromotionThreshold:   defaultEntityPromotion,
