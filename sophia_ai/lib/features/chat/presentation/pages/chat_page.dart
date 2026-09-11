@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/config/feature_flags.dart';
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/models/models.dart';
 import '../../../../core/theme/design_tokens.dart';
 import '../../../../core/theme/motion.dart';
 import '../../../../core/widgets/action_proposal_card.dart';
@@ -10,6 +11,8 @@ import '../../../../core/widgets/map_location_card.dart';
 import '../../../../core/widgets/motion/motion_widgets.dart';
 import '../../../../core/widgets/schedule_conflicts_card.dart';
 import '../../../actions/domain/action_proposals_repository.dart';
+import '../../../contexts/domain/contexts_repository.dart';
+import '../../../contexts/domain/models.dart';
 import '../../domain/entities/chat_message.dart';
 import '../cubit/chat_message_cubit.dart';
 import '../cubit/chat_message_state.dart';
@@ -67,6 +70,7 @@ class _ChatView extends StatelessWidget {
     ),
     body: Column(
       children: [
+        const _ActiveContextBar(),
         Expanded(
           child: BlocBuilder<ChatMessageCubit, ChatMessageState>(
             builder: (context, state) {
@@ -140,6 +144,145 @@ class _ChatView extends StatelessWidget {
       ],
     ),
   );
+}
+
+class _ActiveContextBar extends StatelessWidget {
+  const _ActiveContextBar();
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) => BlocBuilder<ChatMessageCubit, ChatMessageState>(
+    buildWhen: (before, after) =>
+        before.activeEntity != after.activeEntity ||
+        before.manualContext != after.manualContext ||
+        before.contextChanged != after.contextChanged,
+    builder: (context, state) {
+      final entity = state.activeEntity;
+      return Material(
+        color: context.colors.elevated,
+        child: InkWell(
+          onTap: () => _chooseContext(context),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SophiaSpace.md,
+              vertical: SophiaSpace.xs,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  entity == null ? Icons.auto_awesome : Icons.person_outline,
+                  size: 16,
+                  color: context.colors.softInk,
+                ),
+                const SizedBox(width: SophiaSpace.xs),
+                Flexible(
+                  child: Text(
+                    entity == null
+                        ? 'Contexto automático'
+                        : '${state.manualContext == null ? 'Hablando de' : 'Contexto fijado:'} ${entity.label}',
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                ),
+                if (state.contextChanged) ...[
+                  const SizedBox(width: SophiaSpace.xs),
+                  Icon(
+                    Icons.check_circle,
+                    size: 14,
+                    color: context.colors.positive,
+                  ),
+                ],
+                const SizedBox(width: SophiaSpace.xxs),
+                const Icon(Icons.expand_more, size: 18),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+Future<void> _chooseContext(BuildContext context) async {
+  final cubit = context.read<ChatMessageCubit>();
+  late final List<UserContext> entities;
+  try {
+    entities = await sl<ContextsRepository>().listEntities();
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudieron cargar tus contextos: $error')),
+      );
+    }
+    return;
+  }
+  if (!context.mounted) return;
+  final visible =
+      entities
+          .where(
+            (item) =>
+                (item.kind == 'person' || item.kind == 'group') &&
+                (item.status == 'active' || item.status == 'pending_review'),
+          )
+          .toList()
+        ..sort(
+          (a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()),
+        );
+  final selected = await showModalBottomSheet<UserContext?>(
+    context: context,
+    showDragHandle: true,
+    builder: (sheetContext) => SafeArea(
+      child: ListView(
+        shrinkWrap: true,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.auto_awesome),
+            title: const Text('Detectar automáticamente'),
+            subtitle: const Text('Sofía cambia según lo que menciones.'),
+            onTap: () => Navigator.pop(
+              sheetContext,
+              const UserContext(
+                id: '',
+                kind: '',
+                slug: '',
+                label: '',
+                aliases: [],
+                active: true,
+              ),
+            ),
+          ),
+          for (final entity in visible)
+            ListTile(
+              leading: Icon(
+                entity.kind == 'group'
+                    ? Icons.groups_outlined
+                    : Icons.person_outline,
+              ),
+              title: Text(entity.label),
+              subtitle: entity.relationship.isEmpty
+                  ? null
+                  : Text(entity.relationship),
+              onTap: () => Navigator.pop(sheetContext, entity),
+            ),
+        ],
+      ),
+    ),
+  );
+  if (selected == null) return;
+  if (selected.id.isEmpty) {
+    cubit.useAutomaticContext();
+  } else {
+    cubit.setManualContext(
+      EntityReference(
+        id: selected.id,
+        scopeKey: selected.scopeKey,
+        label: selected.label,
+        relationship: selected.relationship,
+      ),
+    );
+  }
 }
 
 class _MessageItem extends StatelessWidget {

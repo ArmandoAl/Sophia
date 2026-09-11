@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 )
 
 const (
@@ -17,13 +18,17 @@ var (
 )
 
 type RuntimeRequest struct {
-	UserID         string
-	Message        string
-	DryRun         bool
-	RequestID      string
-	ConversationID string
-	History        []Turn
-	ActiveContext  string
+	UserID             string
+	Message            string
+	DryRun             bool
+	RequestID          string
+	ConversationID     string
+	History            []Turn
+	ActiveContext      string
+	CurrentEntityID    string
+	CarryForward       string
+	CarryForwardEntity string
+	OpenThreadRetaken  bool
 }
 
 type Turn struct {
@@ -32,13 +37,17 @@ type Turn struct {
 }
 
 type RuntimeResponse struct {
-	Mode             string                 `json:"mode"`
-	RequestID        string                 `json:"request_id"`
-	ContextSummary   ContextSummary         `json:"context_summary"`
-	AvailableTools   []ToolSummary          `json:"available_tools"`
-	ProposedActions  []ActionProposalOutput `json:"proposed_actions"`
-	AssistantMessage string                 `json:"assistant_message"`
-	Observability    RuntimeObservability   `json:"observability"`
+	Mode              string                 `json:"mode"`
+	RequestID         string                 `json:"request_id"`
+	ContextSummary    ContextSummary         `json:"context_summary"`
+	AvailableTools    []ToolSummary          `json:"available_tools"`
+	ProposedActions   []ActionProposalOutput `json:"proposed_actions"`
+	AssistantMessage  string                 `json:"assistant_message"`
+	Observability     RuntimeObservability   `json:"observability"`
+	ActiveEntity      *EntityReference       `json:"active_entity,omitempty"`
+	ContextChanged    bool                   `json:"context_changed"`
+	CarryForward      string                 `json:"-"`
+	OpenThreadRetaken bool                   `json:"-"`
 }
 
 type RuntimeObservability struct {
@@ -50,26 +59,81 @@ type RuntimeObservability struct {
 }
 
 type ContextSummary struct {
-	User              UserSummary       `json:"user"`
-	Profile           ProfileSummary    `json:"profile"`
-	AISettings        AISettingsSummary `json:"ai_settings"`
-	RecentActivities  []ItemSummary     `json:"recent_activities"`
-	DueReminders      []ItemSummary     `json:"due_reminders"`
-	InsightsSummary   map[string]any    `json:"insights_summary"`
-	RelevantMemories  []ItemSummary     `json:"relevant_memories"`
-	Limits            map[string]int    `json:"limits"`
-	CurrentDateTime   string            `json:"current_datetime"`
-	TokenBudget       TokenBudget       `json:"token_budget"`
-	MemoryIncluded    bool              `json:"memory_included"`
-	RemindersIncluded bool              `json:"reminders_included"`
-	PromptBase        string            `json:"-"`
-	ActiveContext     *ActiveContext    `json:"-"`
+	User               UserSummary         `json:"user"`
+	Profile            ProfileSummary      `json:"profile"`
+	AISettings         AISettingsSummary   `json:"ai_settings"`
+	RecentActivities   []ItemSummary       `json:"recent_activities"`
+	DueReminders       []ItemSummary       `json:"due_reminders"`
+	InsightsSummary    map[string]any      `json:"insights_summary"`
+	RelevantMemories   []ItemSummary       `json:"relevant_memories"`
+	Limits             map[string]int      `json:"limits"`
+	CurrentDateTime    string              `json:"current_datetime"`
+	TokenBudget        TokenBudget         `json:"token_budget"`
+	MemoryIncluded     bool                `json:"memory_included"`
+	RemindersIncluded  bool                `json:"reminders_included"`
+	PromptBase         string              `json:"-"`
+	ActiveContext      *ActiveContext      `json:"-"`
+	EntityContexts     []EntityContext     `json:"-"`
+	EntityInstruction  string              `json:"-"`
+	ActiveEntity       *EntityReference    `json:"-"`
+	ContextChanged     bool                `json:"-"`
+	CarryForward       string              `json:"-"`
+	CarryForwardEntity string              `json:"-"`
+	RecentEpisodes     []EpisodeSummary    `json:"-"`
+	OpenThreads        []OpenThreadSummary `json:"-"`
+	OpenThreadRetaken  bool                `json:"-"`
 }
 
 type ActiveContext struct {
-	ScopeKey string   `json:"scope_key"`
-	Label    string   `json:"label"`
-	Beliefs  []string `json:"beliefs"`
+	EntityID     string   `json:"entity_id,omitempty"`
+	ScopeKey     string   `json:"scope_key"`
+	Label        string   `json:"label"`
+	Relationship string   `json:"relationship,omitempty"`
+	Beliefs      []string `json:"beliefs"`
+}
+
+type EntityContext struct {
+	EntityID     string   `json:"entity_id"`
+	ScopeKey     string   `json:"scope_key"`
+	Label        string   `json:"label"`
+	Relationship string   `json:"relationship,omitempty"`
+	Mention      string   `json:"mention"`
+	Start        int      `json:"start"`
+	End          int      `json:"end"`
+	Ambiguous    bool     `json:"ambiguous"`
+	Beliefs      []string `json:"beliefs"`
+}
+
+type EntityReference struct {
+	ID           string `json:"id"`
+	ScopeKey     string `json:"scope_key"`
+	Label        string `json:"label"`
+	Relationship string `json:"relationship,omitempty"`
+}
+
+type EpisodeSummary struct {
+	ID         string    `json:"id"`
+	OccurredAt time.Time `json:"occurred_at"`
+	Summary    string    `json:"summary"`
+	Topics     []string  `json:"topics,omitempty"`
+	Salience   float64   `json:"salience"`
+}
+
+type OpenThreadSummary struct {
+	ID        string   `json:"id"`
+	Source    string   `json:"source"`
+	EntityIDs []string `json:"entity_ids,omitempty"`
+	Summary   string   `json:"summary"`
+}
+
+type ContextBuildState struct {
+	ExplicitActiveContext string
+	CurrentEntityID       string
+	CarryForward          string
+	CarryForwardEntity    string
+	ConversationID        string
+	History               []Turn
+	OpenThreadRetaken     bool
 }
 
 type TokenBudget struct {

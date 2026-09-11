@@ -30,100 +30,125 @@ class _PrivacyDataView extends StatelessWidget {
           ).showSnackBar(SnackBar(content: Text(error)));
         }
       },
-      child: ListView(
-        padding: const EdgeInsets.all(SophiaSpace.lg),
-        children: [
-          const Text(
-            'Tus datos te pertenecen. Puedes obtener una copia o solicitar que eliminemos tu cuenta.',
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            maxWidth: SophiaSize.contentMaxWidth,
           ),
-          const SizedBox(height: SophiaSpace.xl),
-          TactileButton(
-            onPressed: () => context.read<PrivacyCubit>().export(),
-            child: Container(
-              decoration: BoxDecoration(
-                color: context.colors.elevated,
-                border: Border.all(color: context.colors.line),
-                borderRadius: BorderRadius.circular(SophiaRadius.card),
+          child: ListView(
+            padding: const EdgeInsets.all(SophiaSpace.lg),
+            children: [
+              Text(
+                'Tus datos te pertenecen',
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
-              child: ListTile(
-                leading: const Icon(Icons.ios_share_outlined),
-                title: const Text('Exportar mis datos'),
-                subtitle: const Text(
-                  'Descarga un JSON y abre el menú para compartirlo.',
-                ),
+              const SizedBox(height: SophiaSpace.sm),
+              Text(
+                'Aquí decides qué conservar, qué llevarte y cuándo pedir que cerremos tu cuenta.',
+                style: TextStyle(color: context.colors.softInk),
               ),
-            ),
+              const SizedBox(height: SophiaSpace.xl),
+              _PrivacySection(
+                icon: Icons.ios_share_outlined,
+                title: 'Una copia para ti',
+                description:
+                    'Preparamos tus datos en un archivo JSON y abrimos el menú del sistema para que elijas dónde guardarlo.',
+                actionLabel: 'Exportar mis datos',
+                onPressed: () => context.read<PrivacyCubit>().export(),
+              ),
+              const SizedBox(height: SophiaSpace.xl),
+              _PrivacySection(
+                icon: Icons.person_remove_outlined,
+                title: 'Cerrar tu cuenta',
+                description:
+                    'Enviarás una solicitud de borrado. Tu cuenta no se elimina inmediatamente.',
+                actionLabel: 'Solicitar borrado',
+                onPressed: () => _confirmDelete(context),
+              ),
+            ],
           ),
-          const SizedBox(height: SophiaSpace.lg),
-          TactileButton(
-            onPressed: () => _confirmDelete(context),
-            child: Container(
-              decoration: BoxDecoration(
-                color: context.colors.elevated,
-                border: Border.all(color: context.colors.line),
-                borderRadius: BorderRadius.circular(SophiaRadius.card),
-              ),
-              child: ListTile(
-                leading: Icon(
-                  Icons.person_remove_outlined,
-                  color: context.colors.critical,
-                ),
-                title: const Text('Solicitar borrado'),
-                subtitle: const Text(
-                  'Es una solicitud; tu cuenta no se borra inmediatamente.',
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     ),
   );
 
   Future<void> _confirmDelete(BuildContext context) async {
     final controller = TextEditingController();
+    var canSubmit = false;
     final confirmed = await showSophiaSheet<bool>(
       context: context,
-      builder: (dialogContext) => Padding(
-        padding: EdgeInsets.fromLTRB(
-          SophiaSpace.lg,
-          SophiaSpace.md,
-          SophiaSpace.lg,
-          MediaQuery.viewInsetsOf(dialogContext).bottom + SophiaSpace.lg,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Solicitar borrado',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: SophiaSpace.sm),
-            const Text(
-              'Escribe BORRAR para enviar la solicitud. No es un borrado inmediato.',
-            ),
-            const SizedBox(height: SophiaSpace.md),
-            TextField(
-              controller: controller,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'BORRAR'),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('Cancelar'),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            SophiaSpace.lg,
+            SophiaSpace.md,
+            SophiaSpace.lg,
+            MediaQuery.viewInsetsOf(dialogContext).bottom + SophiaSpace.lg,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Solicitar borrado',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: SophiaSpace.sm),
+              const Text(
+                'Escribe BORRAR para enviar la solicitud. Esto no borra la cuenta de inmediato.',
+              ),
+              const SizedBox(height: SophiaSpace.md),
+              TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'Confirmación'),
+                onChanged: (value) => setState(
+                  () => canSubmit = value.trim().toUpperCase() == 'BORRAR',
                 ),
-                FilledButton(
-                  onPressed: () =>
-                      Navigator.pop(dialogContext, controller.text == 'BORRAR'),
-                  child: const Text('Solicitar'),
-                ),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: SophiaSpace.md),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TactileButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Padding(
+                      padding: EdgeInsets.all(SophiaSpace.sm),
+                      child: Text('Cancelar'),
+                    ),
+                  ),
+                  TactileButton(
+                    onPressed: canSubmit
+                        ? () => Navigator.pop(dialogContext, true)
+                        : null,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: SophiaSpace.md,
+                        vertical: SophiaSpace.sm,
+                      ),
+                      decoration: BoxDecoration(
+                        color: canSubmit
+                            ? context.colors.accent
+                            : context.colors.line,
+                        borderRadius: BorderRadius.circular(
+                          SophiaRadius.control,
+                        ),
+                      ),
+                      child: Text(
+                        'Enviar solicitud',
+                        style: TextStyle(
+                          color: canSubmit
+                              ? context.colors.surface
+                              : context.colors.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -136,4 +161,62 @@ class _PrivacyDataView extends StatelessWidget {
       ).showSnackBar(const SnackBar(content: Text('Solicitud enviada.')));
     }
   }
+}
+
+class _PrivacySection extends StatelessWidget {
+  const _PrivacySection({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.actionLabel,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String title, description, actionLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(SophiaSpace.lg),
+    decoration: BoxDecoration(
+      color: context.colors.elevated,
+      border: Border.all(color: context.colors.line),
+      borderRadius: BorderRadius.circular(SophiaRadius.card),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, color: context.colors.softInk),
+        const SizedBox(height: SophiaSpace.md),
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: SophiaSpace.xs),
+        Text(
+          description,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: context.colors.softInk),
+        ),
+        const SizedBox(height: SophiaSpace.lg),
+        TactileButton(
+          semanticLabel: actionLabel,
+          onPressed: onPressed,
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: SophiaSpace.md,
+              vertical: SophiaSpace.sm,
+            ),
+            decoration: BoxDecoration(
+              border: Border.all(color: context.colors.line),
+              borderRadius: BorderRadius.circular(SophiaRadius.control),
+            ),
+            child: Text(
+              actionLabel,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }

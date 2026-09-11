@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sophia_ai/core/di/service_locator.dart';
@@ -25,14 +26,23 @@ class RemindersPage extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Reminders'),
           actions: [
-            IconButton(
+            TactileButton(
+              semanticLabel: 'Actualizar recordatorios',
               onPressed: () => context.read<RemindersCubit>().load(),
-              icon: const Icon(Icons.refresh),
+              child: const Padding(
+                padding: EdgeInsets.all(SophiaSpace.sm),
+                child: Icon(Icons.refresh),
+              ),
             ),
-            IconButton(
+            TactileButton(
+              semanticLabel: 'Crear recordatorio',
               onPressed: () => _openEditor(context),
-              icon: const Icon(Icons.add),
+              child: const Padding(
+                padding: EdgeInsets.all(SophiaSpace.sm),
+                child: Icon(Icons.add),
+              ),
             ),
+            const SizedBox(width: SophiaSpace.xs),
           ],
         ),
         body: const _Body(),
@@ -75,11 +85,14 @@ class _Body extends StatelessWidget {
                   children: [
                     Text(
                       state.errorMessage!,
-                      style: const TextStyle(color: Colors.white70),
+                      style: TextStyle(color: context.colors.softInk),
                     ),
-                    TextButton(
+                    TactileButton(
                       onPressed: () => context.read<RemindersCubit>().load(),
-                      child: const Text('Reintentar'),
+                      child: const Padding(
+                        padding: EdgeInsets.all(SophiaSpace.sm),
+                        child: Text('Reintentar'),
+                      ),
                     ),
                   ],
                 ),
@@ -104,11 +117,13 @@ class _Body extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.all(SophiaSpace.lg),
                 children: [
-                  const Text(
+                  Text(
                     'Simple recurrence: none, daily, weekly, monthly',
-                    style: TextStyle(color: Colors.cyanAccent, fontSize: 12),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: context.colors.accent,
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: SophiaSpace.sm),
                   ...state.reminders.map((r) => _ReminderTile(r)),
                 ],
               ),
@@ -122,24 +137,53 @@ class _ReminderTile extends StatelessWidget {
   const _ReminderTile(this.reminder);
   final Reminder reminder;
   @override
-  Widget build(BuildContext context) => Card(
-    color: const Color(0xFF151B24),
-    child: ListTile(
-      onTap: () => context.push('/reminders/${reminder.id}'),
-      title: Text(reminder.title, style: const TextStyle(color: Colors.white)),
-      subtitle: Text(
-        '${_when(reminder.scheduledAt)} · ${reminder.recurrenceRule.name}',
-        style: const TextStyle(color: Colors.cyanAccent),
-      ),
-      trailing: PopupMenuButton<String>(
-        onSelected: (v) => v == 'cancel'
-            ? context.read<RemindersCubit>().cancel(reminder.id)
-            : context.read<RemindersCubit>().archive(reminder.id),
-        itemBuilder: (_) => const [
-          PopupMenuItem(value: 'cancel', child: Text('Cancelar')),
-          PopupMenuItem(value: 'archive', child: Text('Archivar')),
-        ],
-      ),
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: SophiaSpace.sm),
+    padding: const EdgeInsets.all(SophiaSpace.md),
+    decoration: BoxDecoration(
+      color: context.colors.elevated,
+      border: Border.all(color: context.colors.line),
+      borderRadius: BorderRadius.circular(SophiaRadius.card),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: TactileButton(
+            onPressed: () => context.push('/reminders/${reminder.id}'),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: SophiaSpace.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(reminder.title),
+                  Text(
+                    '${_when(reminder.scheduledAt)} · ${reminder.recurrenceRule.name}',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: context.colors.accent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        TactileButton(
+          semanticLabel: 'Cancelar ${reminder.title}',
+          onPressed: () => context.read<RemindersCubit>().cancel(reminder.id),
+          child: const Padding(
+            padding: EdgeInsets.all(SophiaSpace.xs),
+            child: Icon(Icons.close),
+          ),
+        ),
+        TactileButton(
+          semanticLabel: 'Archivar ${reminder.title}',
+          onPressed: () => context.read<RemindersCubit>().archive(reminder.id),
+          child: const Padding(
+            padding: EdgeInsets.all(SophiaSpace.xs),
+            child: Icon(Icons.archive_outlined),
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -169,21 +213,21 @@ class ReminderDetailPage extends StatelessWidget {
           if (s.error != null) return Center(child: Text(s.error!));
           final r = s.reminder!;
           return Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(SophiaSpace.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(r.title, style: Theme.of(context).textTheme.headlineSmall),
-                const SizedBox(height: 12),
+                const SizedBox(height: SophiaSpace.sm),
                 Text(r.description),
-                const SizedBox(height: 12),
+                const SizedBox(height: SophiaSpace.sm),
                 Text('Programado: ${_when(r.scheduledAt)}'),
                 Text('Recurrencia: ${r.recurrenceRule.name}'),
                 Text('Estado: ${r.status.name}'),
-                const SizedBox(height: 24),
-                const Text(
+                const SizedBox(height: SophiaSpace.lg),
+                Text(
                   'El reminder se guarda en Sofia. Las notificaciones push reales todavía no están activas.',
-                  style: TextStyle(color: Colors.white70),
+                  style: TextStyle(color: context.colors.softInk),
                 ),
               ],
             ),
@@ -209,10 +253,10 @@ class _ReminderEditorState extends State<_ReminderEditor> {
   @override
   Widget build(BuildContext context) => Padding(
     padding: EdgeInsets.only(
-      left: 20,
-      right: 20,
-      top: 20,
-      bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
+      left: SophiaSpace.lg,
+      right: SophiaSpace.lg,
+      top: SophiaSpace.lg,
+      bottom: MediaQuery.viewInsetsOf(context).bottom + SophiaSpace.lg,
     ),
     child: Wrap(
       children: [
@@ -224,10 +268,8 @@ class _ReminderEditorState extends State<_ReminderEditor> {
           controller: description,
           decoration: const InputDecoration(labelText: 'Descripción'),
         ),
-        ListTile(
-          title: Text('Fecha: ${_when(scheduled)}'),
-          trailing: const Icon(Icons.event),
-          onTap: () async {
+        TactileButton(
+          onPressed: () async {
             final d = await showDatePicker(
               context: context,
               firstDate: DateTime.now(),
@@ -246,17 +288,29 @@ class _ReminderEditorState extends State<_ReminderEditor> {
               );
             }
           },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: SophiaSpace.sm),
+            child: Row(
+              children: [
+                Expanded(child: Text('Fecha: ${_when(scheduled)}')),
+                const Icon(Icons.event),
+              ],
+            ),
+          ),
         ),
         DropdownButtonFormField(
           initialValue: recurrence,
           items: RecurrenceRule.values
               .map((r) => DropdownMenuItem(value: r, child: Text(r.name)))
               .toList(),
-          onChanged: (r) => setState(() => recurrence = r!),
+          onChanged: (r) {
+            HapticFeedback.selectionClick();
+            setState(() => recurrence = r!);
+          },
           decoration: const InputDecoration(labelText: 'Recurrence'),
         ),
-        const SizedBox(height: 12),
-        FilledButton.icon(
+        const SizedBox(height: SophiaSpace.sm),
+        TactileButton(
           onPressed: () async {
             if (title.text.trim().isEmpty) return;
             final navigator = Navigator.of(context);
@@ -271,13 +325,30 @@ class _ReminderEditorState extends State<_ReminderEditor> {
             );
             if (ok && mounted) navigator.pop();
           },
-          icon: const Icon(Icons.save),
-          label: const Text('Guardar reminder'),
+          child: Container(
+            padding: const EdgeInsets.all(SophiaSpace.sm),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: context.colors.accent,
+              borderRadius: BorderRadius.circular(SophiaRadius.control),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.save, color: context.colors.surface),
+                const SizedBox(width: SophiaSpace.xs),
+                Text(
+                  'Guardar reminder',
+                  style: TextStyle(color: context.colors.surface),
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 8),
-        const Text(
+        const SizedBox(height: SophiaSpace.xs),
+        Text(
           'Push real puede no estar activo todavía.',
-          style: TextStyle(color: Colors.white70),
+          style: TextStyle(color: context.colors.softInk),
         ),
       ],
     ),

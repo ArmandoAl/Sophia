@@ -132,7 +132,7 @@ func TestContextBuilderAddsExplicitContextBeliefsToPromptSuffix(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(suffix), `"active_context":{"scope_key":"person:maria","label":"María"`) || !strings.Contains(string(suffix), statement) {
+	if !strings.Contains(string(suffix), `"active_entity":`) || !strings.Contains(string(suffix), `"scope_key":"person:maria"`) || !strings.Contains(string(suffix), statement) {
 		t.Fatalf("active context missing from suffix: %s", suffix)
 	}
 	prefix, err := runtimedomain.BuildPromptPrefix(runtimedomain.ModelRequest{PromptBase: summary.PromptBase})
@@ -141,6 +141,137 @@ func TestContextBuilderAddsExplicitContextBeliefsToPromptSuffix(t *testing.T) {
 	}
 	if strings.Contains(string(prefix), statement) {
 		t.Fatalf("context belief leaked into prefix: %s", prefix)
+	}
+}
+
+func TestContextBuilderPromptsToDisambiguateHomonyms(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-homonyms", "homonyms@example.com")
+	learning := learningapp.NewService(
+		learninginfra.NewInMemoryBeliefRepository(),
+		learninginfra.NewInMemoryPromptVersionRepository(),
+		learninginfra.NewInMemoryDailySummaryRepository(),
+	)
+	learning.SetContextRepository(learninginfra.NewInMemoryUserContextRepository())
+	for _, input := range []learningdomain.UserContextCreate{
+		{Kind: learningdomain.ScopePerson, Slug: "diana-hermana", Label: "Diana", Relationship: "hermana"},
+		{Kind: learningdomain.ScopePerson, Slug: "diana-trabajo", Label: "Diana", Relationship: "compañera"},
+	} {
+		if _, err := learning.CreateUserContext(ctx, user.ID, input); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env.contextBuilder.SetLearningContextReader(learning)
+	summary, err := env.contextBuilder.Build(ctx, user.ID, "Hablé con Diana ayer")
+	if err != nil {
+		t.Fatal(err)
+	}
+	suffix, err := runtimedomain.BuildPromptSuffix(runtimedomain.ModelRequest{Message: "Hablé con Diana ayer", Context: summary})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(suffix)
+	if len(summary.EntityContexts) != 2 || !strings.Contains(text, `"ambiguous":true`) || !strings.Contains(text, "Ask the user which person") {
+		t.Fatalf("ambiguous entities or disambiguation instruction missing: %s", text)
+	}
+}
+
+type carryExtractor struct{ calls int }
+
+func (m *carryExtractor) Generate(context.Context, runtimedomain.ModelRequest) (runtimedomain.ModelResponse, error) {
+	m.calls++
+	return runtimedomain.ModelResponse{AssistantMessage: `{"carry_forward":"Veníamos organizando el cumpleaños de María. Faltaba confirmar el lugar."}`}, nil
+}
+
+func TestContextBuilderChangesOnlyForDirectedEntityAndReusesCarry(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-switch", "switch@example.com")
+	learning := learningapp.NewService(learninginfra.NewInMemoryBeliefRepository(), learninginfra.NewInMemoryPromptVersionRepository(), learninginfra.NewInMemoryDailySummaryRepository())
+	learning.SetContextRepository(learninginfra.NewInMemoryUserContextRepository())
+	maria, err := learning.CreateUserContext(ctx, user.ID, learningdomain.UserContextCreate{Kind: learningdomain.ScopePerson, Slug: "maria", Label: "María"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	diana, err := learning.CreateUserContext(ctx, user.ID, learningdomain.UserContextCreate{Kind: learningdomain.ScopePerson, Slug: "diana", Label: "Diana"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	extractor := &carryExtractor{}
+	env.contextBuilder.SetLearningContextReader(learning)
+	env.contextBuilder.SetExtractor(extractor)
+	history := []runtimedomain.Turn{{Role: "user", Content: "Estoy organizando el cumpleaños de María"}}
+
+	passing, err := env.contextBuilder.BuildStateful(ctx, user.ID, "Ayer vi a Diana en el mercado.", runtimedomain.ContextBuildState{CurrentEntityID: maria.ID, History: history})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if passing.ActiveEntity == nil || passing.ActiveEntity.ID != maria.ID || passing.ContextChanged || extractor.calls != 0 {
+		t.Fatalf("passing mention changed context: %+v calls=%d", passing.ActiveEntity, extractor.calls)
+	}
+
+	directed, err := env.contextBuilder.BuildStateful(ctx, user.ID, "¿Cómo está Diana?", runtimedomain.ContextBuildState{CurrentEntityID: maria.ID, History: history})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if directed.ActiveEntity == nil || directed.ActiveEntity.ID != diana.ID || !directed.ContextChanged || extractor.calls != 1 || directed.CarryForward == "" {
+		t.Fatalf("directed mention did not switch once: entity=%+v changed=%v carry=%q calls=%d", directed.ActiveEntity, directed.ContextChanged, directed.CarryForward, extractor.calls)
+	}
+	reused, err := env.contextBuilder.BuildStateful(ctx, user.ID, "Sigue contándome", runtimedomain.ContextBuildState{CurrentEntityID: diana.ID, CarryForwardEntity: diana.ID, CarryForward: directed.CarryForward, History: history})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reused.CarryForward != directed.CarryForward || extractor.calls != 1 {
+		t.Fatalf("carry was recalculated: %q calls=%d", reused.CarryForward, extractor.calls)
+	}
+}
+
+func TestExplicitContextWinsOverAutomaticDetection(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-explicit", "explicit@example.com")
+	learning := learningapp.NewService(learninginfra.NewInMemoryBeliefRepository(), learninginfra.NewInMemoryPromptVersionRepository(), learninginfra.NewInMemoryDailySummaryRepository())
+	learning.SetContextRepository(learninginfra.NewInMemoryUserContextRepository())
+	maria, _ := learning.CreateUserContext(ctx, user.ID, learningdomain.UserContextCreate{Kind: learningdomain.ScopePerson, Slug: "maria", Label: "María"})
+	_, _ = learning.CreateUserContext(ctx, user.ID, learningdomain.UserContextCreate{Kind: learningdomain.ScopePerson, Slug: "diana", Label: "Diana"})
+	env.contextBuilder.SetLearningContextReader(learning)
+	summary, err := env.contextBuilder.BuildStateful(ctx, user.ID, "¿Cómo está Diana?", runtimedomain.ContextBuildState{ExplicitActiveContext: maria.ScopeKey()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.ActiveEntity == nil || summary.ActiveEntity.ID != maria.ID {
+		t.Fatalf("automatic detection overrode explicit context: %+v", summary.ActiveEntity)
+	}
+}
+
+func TestContextBuilderOffersOnlyOneOpenThreadPerConversation(t *testing.T) {
+	env := newRuntimeTestEnv(t)
+	ctx := context.Background()
+	user := env.createUser(t, "user-thread", "thread@example.com")
+	learning := learningapp.NewService(learninginfra.NewInMemoryBeliefRepository(), learninginfra.NewInMemoryPromptVersionRepository(), learninginfra.NewInMemoryDailySummaryRepository())
+	learning.SetContextRepository(learninginfra.NewInMemoryUserContextRepository())
+	entity, _ := learning.CreateUserContext(ctx, user.ID, learningdomain.UserContextCreate{Kind: learningdomain.ScopePerson, Slug: "diana", Label: "Diana"})
+	valid, due := time.Now().UTC().Add(48*time.Hour), time.Now().UTC().Add(-time.Hour)
+	for _, statement := range []string{"Decidirá si cambia de casa", "Confirmará el viaje pendiente"} {
+		if _, err := learning.UpsertEntityBelief(ctx, user.ID, entity.ID, statement, learningdomain.CategoryPersonal, learningdomain.FactKindState, &valid, &due); err != nil {
+			t.Fatal(err)
+		}
+	}
+	env.contextBuilder.SetLearningContextReader(learning)
+	first, err := env.contextBuilder.BuildStateful(ctx, user.ID, "Cuéntame de Diana", runtimedomain.ContextBuildState{ExplicitActiveContext: entity.ScopeKey()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first.OpenThreads) != 1 || !first.OpenThreadRetaken {
+		t.Fatalf("first open thread offer=%+v", first.OpenThreads)
+	}
+	second, err := env.contextBuilder.BuildStateful(ctx, user.ID, "Sigue", runtimedomain.ContextBuildState{ExplicitActiveContext: entity.ScopeKey(), OpenThreadRetaken: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(second.OpenThreads) != 0 {
+		t.Fatalf("more than one thread offered in conversation: %+v", second.OpenThreads)
 	}
 }
 

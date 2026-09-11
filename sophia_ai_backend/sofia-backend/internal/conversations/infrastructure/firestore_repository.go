@@ -30,13 +30,16 @@ type FirestoreConversationMessageRepository struct {
 }
 
 type firestoreConversation struct {
-	ID            string     `firestore:"id"`
-	UserID        string     `firestore:"user_id"`
-	Title         string     `firestore:"title"`
-	Status        string     `firestore:"status"`
-	CreatedAt     time.Time  `firestore:"created_at"`
-	UpdatedAt     time.Time  `firestore:"updated_at"`
-	LastMessageAt *time.Time `firestore:"last_message_at,omitempty"`
+	ID                 string     `firestore:"id"`
+	UserID             string     `firestore:"user_id"`
+	Title              string     `firestore:"title"`
+	Status             string     `firestore:"status"`
+	CreatedAt          time.Time  `firestore:"created_at"`
+	UpdatedAt          time.Time  `firestore:"updated_at"`
+	LastMessageAt      *time.Time `firestore:"last_message_at,omitempty"`
+	CarryForward       string     `firestore:"carry_forward"`
+	CarryForwardEntity string     `firestore:"carry_forward_entity"`
+	OpenThreadRetaken  bool       `firestore:"open_thread_retaken"`
 }
 
 type firestoreMessage struct {
@@ -205,13 +208,16 @@ func (r *FirestoreConversationMessageRepository) List(ctx context.Context, userI
 
 func conversationToDocument(conversation *domain.Conversation) firestoreConversation {
 	return firestoreConversation{
-		ID:            conversation.ID,
-		UserID:        conversation.UserID,
-		Title:         conversation.Title,
-		Status:        conversation.Status,
-		CreatedAt:     conversation.CreatedAt,
-		UpdatedAt:     conversation.UpdatedAt,
-		LastMessageAt: conversation.LastMessageAt,
+		ID:                 conversation.ID,
+		UserID:             conversation.UserID,
+		Title:              conversation.Title,
+		Status:             conversation.Status,
+		CreatedAt:          conversation.CreatedAt,
+		UpdatedAt:          conversation.UpdatedAt,
+		LastMessageAt:      conversation.LastMessageAt,
+		CarryForward:       conversation.CarryForward,
+		CarryForwardEntity: conversation.CarryForwardEntity,
+		OpenThreadRetaken:  conversation.OpenThreadRetaken,
 	}
 }
 
@@ -221,13 +227,16 @@ func documentToConversation(doc *firestore.DocumentSnapshot) (*domain.Conversati
 		return nil, err
 	}
 	return &domain.Conversation{
-		ID:            stored.ID,
-		UserID:        stored.UserID,
-		Title:         stored.Title,
-		Status:        stored.Status,
-		CreatedAt:     stored.CreatedAt,
-		UpdatedAt:     stored.UpdatedAt,
-		LastMessageAt: stored.LastMessageAt,
+		ID:                 stored.ID,
+		UserID:             stored.UserID,
+		Title:              stored.Title,
+		Status:             stored.Status,
+		CreatedAt:          stored.CreatedAt,
+		UpdatedAt:          stored.UpdatedAt,
+		LastMessageAt:      stored.LastMessageAt,
+		CarryForward:       stored.CarryForward,
+		CarryForwardEntity: stored.CarryForwardEntity,
+		OpenThreadRetaken:  stored.OpenThreadRetaken,
 	}, nil
 }
 

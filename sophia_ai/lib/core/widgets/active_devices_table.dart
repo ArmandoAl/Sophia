@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../../../core/widgets/sophia_card.dart';
+import '../theme/design_tokens.dart';
+import 'sophia_card.dart';
 
 class ActiveDevicesTable extends StatelessWidget {
   const ActiveDevicesTable({super.key});
@@ -14,46 +15,74 @@ class ActiveDevicesTable extends StatelessWidget {
             "Active Matter Devices",
             style: Theme.of(context).textTheme.titleLarge,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: SophiaSpace.md),
           // Header
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8.0),
+          Padding(
+            padding: const EdgeInsets.only(bottom: SophiaSpace.xs),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("Device Name", style: TextStyle(color: Colors.grey)),
-                Text("Status", style: TextStyle(color: Colors.grey)),
+                Text(
+                  "Device Name",
+                  style: TextStyle(color: context.colors.softInk),
+                ),
+                Text("Status", style: TextStyle(color: context.colors.softInk)),
               ],
             ),
           ),
-          const Divider(color: Colors.white10),
+          Divider(color: context.colors.line),
           // List Items (Simulados según Screen 12)
-          _buildRow("Living Room Hub", "Online", Colors.greenAccent),
-          _buildRow("Smart Thermostat", "Online", Colors.greenAccent),
-          _buildRow("Kitchen Display", "Warning", Colors.amberAccent),
-          _buildRow("Garage Door Sensor", "Offline", Colors.redAccent),
-          _buildRow("Bedroom Lamp", "Online", Colors.greenAccent),
+          _buildRow(
+            context,
+            "Living Room Hub",
+            "Online",
+            context.colors.positive,
+          ),
+          _buildRow(
+            context,
+            "Smart Thermostat",
+            "Online",
+            context.colors.positive,
+          ),
+          _buildRow(
+            context,
+            "Kitchen Display",
+            "Warning",
+            context.colors.attention,
+          ),
+          _buildRow(
+            context,
+            "Garage Door Sensor",
+            "Offline",
+            context.colors.critical,
+          ),
+          _buildRow(context, "Bedroom Lamp", "Online", context.colors.positive),
         ],
       ),
     );
   }
 
-  Widget _buildRow(String name, String status, Color color) {
+  Widget _buildRow(
+    BuildContext context,
+    String name,
+    String status,
+    Color color,
+  ) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
+      padding: const EdgeInsets.symmetric(vertical: SophiaSpace.sm),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(name, style: const TextStyle(color: Colors.white, fontSize: 16)),
+          Text(name, style: Theme.of(context).textTheme.bodyMedium),
           Row(
             children: [
               Container(
-                width: 8,
-                height: 8,
+                width: SophiaSpace.xs,
+                height: SophiaSpace.xs,
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
-              const SizedBox(width: 8),
-              Text(status, style: const TextStyle(color: Colors.grey)),
+              const SizedBox(width: SophiaSpace.xs),
+              Text(status, style: TextStyle(color: context.colors.softInk)),
             ],
           ),
         ],

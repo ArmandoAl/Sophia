@@ -25,6 +25,12 @@ func (c *FakeModelClient) Generate(_ context.Context, request domain.ModelReques
 		}, nil
 	}
 	if request.Task == domain.TaskExtract {
+		if strings.Contains(request.Message, "carry_forward") {
+			return domain.ModelResponse{AssistantMessage: `{"carry_forward":"La conversación venía tratando el tema anterior."}`, Usage: domain.Usage{Model: "fake"}}, nil
+		}
+		if strings.Contains(request.Message, `\"episodes\"`) {
+			return domain.ModelResponse{AssistantMessage: `{"episodes":[]}`, Usage: domain.Usage{Model: "fake"}}, nil
+		}
 		return domain.ModelResponse{AssistantMessage: `{"beliefs":[]}`, Usage: domain.Usage{Model: "fake"}}, nil
 	}
 	response := domain.ModelResponse{

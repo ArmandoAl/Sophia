@@ -187,6 +187,7 @@ class _TactileButtonState extends State<TactileButton>
     enabled: widget.onPressed != null,
     label: widget.semanticLabel,
     child: FocusableActionDetector(
+      enabled: widget.onPressed != null,
       onShowFocusHighlight: (value) => setState(() => focused = value),
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.enter): ActivateIntent(),
@@ -225,13 +226,25 @@ class _TactileButtonState extends State<TactileButton>
             borderRadius: BorderRadius.circular(SophiaRadius.control),
           ),
           child: SophiaMotion.reduced(context)
-              ? widget.child
+              ? ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minWidth: SophiaSize.minimumTapTarget,
+                    minHeight: SophiaSize.minimumTapTarget,
+                  ),
+                  child: widget.child,
+                )
               : const ScaleEffect(
                   begin: Offset(1, 1),
                   end: Offset(.97, .97),
                 ).build(
                   context,
-                  widget.child,
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      minWidth: SophiaSize.minimumTapTarget,
+                      minHeight: SophiaSize.minimumTapTarget,
+                    ),
+                    child: widget.child,
+                  ),
                   controller,
                   EffectEntry(
                     effect: const ScaleEffect(

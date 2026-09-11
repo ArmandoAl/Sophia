@@ -26,6 +26,8 @@ type sendMessageResponse struct {
 	AssistantMessage *domain.ConversationMessage          `json:"assistant_message"`
 	ProposedActions  []runtimedomain.ActionProposalOutput `json:"proposed_actions"`
 	RuntimeRequestID string                               `json:"runtime_request_id"`
+	ActiveEntity     *runtimedomain.EntityReference       `json:"active_entity,omitempty"`
+	ContextChanged   bool                                 `json:"context_changed"`
 }
 
 func listConversationsFromDomain(conversations []*domain.Conversation, limit int) listConversationsResponse {
@@ -51,5 +53,7 @@ func sendMessageFromResult(result *application.SendMessageResult) sendMessageRes
 		AssistantMessage: result.AssistantMessage,
 		ProposedActions:  result.ProposedActions,
 		RuntimeRequestID: result.RuntimeRequestID,
+		ActiveEntity:     result.ActiveEntity,
+		ContextChanged:   result.ContextChanged,
 	}
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../theme/design_tokens.dart';
 import '../theme/motion.dart';
+import 'motion/motion_widgets.dart';
 
 class MainWrapper extends StatefulWidget {
   const MainWrapper({super.key, required this.navigationShell});
@@ -86,12 +87,31 @@ class _Sidebar extends StatelessWidget {
           (1, Icons.today_outlined, 'Hoy'),
           (2, Icons.settings_outlined, 'Ajustes'),
         ])
-          ListTile(
-            selected: i == index,
-            selectedColor: context.colors.accent,
-            leading: Icon(icon),
-            title: Text(label),
-            onTap: () => onTap(i),
+          TactileButton(
+            haptics: false,
+            onPressed: () => onTap(i),
+            child: Padding(
+              padding: const EdgeInsets.all(SophiaSpace.sm),
+              child: Row(
+                children: [
+                  Icon(
+                    icon,
+                    color: i == index
+                        ? context.colors.accent
+                        : context.colors.softInk,
+                  ),
+                  const SizedBox(width: SophiaSpace.sm),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: i == index
+                          ? context.colors.accent
+                          : context.colors.ink,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
       ],
     ),
@@ -170,9 +190,10 @@ class _NavItem extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    focusColor: context.colors.accent.withValues(alpha: .22),
-    onTap: onTap,
+  Widget build(BuildContext context) => TactileButton(
+    haptics: false,
+    semanticLabel: label,
+    onPressed: onTap,
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [

@@ -22,6 +22,8 @@ type SendMessageResult struct {
 	AssistantMessage *domain.ConversationMessage
 	ProposedActions  []runtimedomain.ActionProposalOutput
 	RuntimeRequestID string
+	ActiveEntity     *runtimedomain.EntityReference
+	ContextChanged   bool
 }
 
 func NewService(conversations domain.ConversationRepository, messages domain.ConversationMessageRepository, runtime runtimedomain.RuntimeService) *Service {
@@ -101,12 +103,16 @@ func (s *Service) SendMessage(ctx context.Context, userID, conversationID, conte
 	}
 
 	runtimeResponse, err := s.runtime.HandleMessage(ctx, runtimedomain.RuntimeRequest{
-		UserID:         userID,
-		Message:        userMessage.Content,
-		DryRun:         false,
-		ConversationID: conversation.ID,
-		History:        history,
-		ActiveContext:  strings.TrimSpace(activeContext),
+		UserID:             userID,
+		Message:            userMessage.Content,
+		DryRun:             false,
+		ConversationID:     conversation.ID,
+		History:            history,
+		ActiveContext:      strings.TrimSpace(activeContext),
+		CurrentEntityID:    conversation.CarryForwardEntity,
+		CarryForward:       conversation.CarryForward,
+		CarryForwardEntity: conversation.CarryForwardEntity,
+		OpenThreadRetaken:  conversation.OpenThreadRetaken,
 	})
 	if err != nil {
 		return nil, err
@@ -114,6 +120,16 @@ func (s *Service) SendMessage(ctx context.Context, userID, conversationID, conte
 	if runtimeResponse == nil || runtimeResponse.AssistantMessage == "" {
 		return nil, errors.New("runtime returned empty assistant message")
 	}
+	if runtimeResponse.ActiveEntity != nil {
+		if conversation.CarryForwardEntity != runtimeResponse.ActiveEntity.ID && !runtimeResponse.ContextChanged {
+			conversation.CarryForward = ""
+		}
+		conversation.CarryForwardEntity = runtimeResponse.ActiveEntity.ID
+		if runtimeResponse.ContextChanged {
+			conversation.CarryForward = runtimeResponse.CarryForward
+		}
+	}
+	conversation.OpenThreadRetaken = conversation.OpenThreadRetaken || runtimeResponse.OpenThreadRetaken
 
 	assistantMessage, err := domain.NewMessage(uuid.New().String(), conversation.ID, userID, domain.RoleAssistant, runtimeResponse.AssistantMessage, runtimeResponse.RequestID)
 	if err != nil {
@@ -133,6 +149,8 @@ func (s *Service) SendMessage(ctx context.Context, userID, conversationID, conte
 		AssistantMessage: assistantMessage,
 		ProposedActions:  runtimeResponse.ProposedActions,
 		RuntimeRequestID: runtimeResponse.RequestID,
+		ActiveEntity:     runtimeResponse.ActiveEntity,
+		ContextChanged:   runtimeResponse.ContextChanged,
 	}, nil
 }
 

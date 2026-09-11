@@ -40,6 +40,27 @@ func TestRunDailySilentDayDoesNotCallModel(t *testing.T) {
 	}
 }
 
+func TestRunOnceArchivesExpiredStates(t *testing.T) {
+	env := newWorkerTestEnv(t)
+	ctx := context.Background()
+	entity, err := env.learning.CreateUserContext(ctx, env.userID, learningdomain.UserContextCreate{Kind: learningdomain.ScopePerson, Slug: "diana", Label: "Diana"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expired := time.Date(2026, 9, 6, 0, 0, 0, 0, time.UTC)
+	belief, err := env.learning.UpsertEntityBelief(ctx, env.userID, entity.ID, "Está enferma", learningdomain.CategoryPersonal, learningdomain.FactKindState, &expired, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := env.worker.RunOnce(ctx); err != nil {
+		t.Fatal(err)
+	}
+	archived, err := env.learning.GetBelief(ctx, env.userID, belief.ID)
+	if err != nil || archived.Status != learningdomain.StatusArchived {
+		t.Fatalf("expired state was not archived: %+v err=%v", archived, err)
+	}
+}
+
 func TestRunDailyReinforceKeepsBeliefInCore(t *testing.T) {
 	env := newWorkerTestEnv(t)
 	ctx := context.Background()
@@ -263,6 +284,24 @@ func TestRunDailyConcurrentAppliesDeltaOnce(t *testing.T) {
 	}
 	if updated.EvidenceCount != 2 {
 		t.Fatalf("EvidenceCount = %d, want 2", updated.EvidenceCount)
+	}
+}
+
+func TestRunOncePromotesEntityCandidatesAtNight(t *testing.T) {
+	env := newWorkerTestEnv(t)
+	env.worker.options.RunHourLocal = 3
+	env.learning.SetEntityCandidateRepository(learninginfra.NewInMemoryEntityCandidateRepository(), 3)
+	for range 3 {
+		if _, err := env.learning.ResolveEntities(context.Background(), env.userID, "Hablé con Lucía ayer"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := env.worker.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	values, err := env.learning.ListEntities(context.Background(), env.userID, learningdomain.ScopePerson, learningdomain.ContextStatusPendingReview)
+	if err != nil || len(values) != 1 || values[0].Slug != "lucia" {
+		t.Fatalf("nightly worker did not promote candidate: %+v err=%v", values, err)
 	}
 }
 

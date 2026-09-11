@@ -3,7 +3,9 @@ package domain
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestPromptPrefixIsByteIdenticalAcrossRequests(t *testing.T) {
@@ -36,5 +38,34 @@ func TestPromptPrefixIsByteIdenticalAcrossRequests(t *testing.T) {
 	}
 	if sha256.Sum256(firstPrefix) != sha256.Sum256(secondPrefix) {
 		t.Fatalf("prompt prefix changed between requests:\n%s\n%s", firstPrefix, secondPrefix)
+	}
+}
+
+func TestPromptSuffixNeverExceedsBudgetAndEpisodesStayOutOfPrefix(t *testing.T) {
+	context := ContextSummary{
+		CarryForward:     strings.Repeat("arrastre ", 200),
+		ActiveContext:    &ActiveContext{ScopeKey: "person:diana", Label: "Diana", Beliefs: []string{strings.Repeat("hecho vigente ", 140)}},
+		RecentEpisodes:   []EpisodeSummary{{ID: "episode", OccurredAt: time.Now(), Summary: strings.Repeat("recuerdo episódico ", 120), Salience: 0.8}},
+		RecentActivities: make([]ItemSummary, 40),
+		InsightsSummary:  map[string]any{"oversized": strings.Repeat("estado reciente ", 300)},
+	}
+	history := make([]Turn, 20)
+	for index := range history {
+		history[index] = Turn{Role: "user", Content: strings.Repeat("historia ", 100)}
+	}
+	request := ModelRequest{Message: strings.Repeat("mensaje ", 200), Context: context, History: history, PromptBase: "base estable"}
+	suffix, err := BuildPromptSuffix(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tokens := approximatePromptTokens(suffix); tokens > PromptSuffixTokenBudget {
+		t.Fatalf("suffix tokens=%d ceiling=%d", tokens, PromptSuffixTokenBudget)
+	}
+	prefix, err := BuildPromptPrefix(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(prefix), "recuerdo episódico") || strings.Contains(string(prefix), "hecho vigente") {
+		t.Fatalf("dynamic entity memory leaked into prefix: %s", prefix)
 	}
 }

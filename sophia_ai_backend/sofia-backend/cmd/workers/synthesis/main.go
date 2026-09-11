@@ -42,9 +42,13 @@ func main() {
 		logger.Fatalf("build model client: %v", err)
 	}
 
+	learning := learningapp.NewService(repos.Beliefs, repos.PromptVersions, repos.DailySummaries)
+	learning.SetContextRepository(repos.UserContexts)
+	learning.SetEntityCandidateRepository(repos.EntityCandidates, cfg.EntityPromotionThreshold)
+	learning.SetEpisodeStore(repos.Episodes, model, cfg.EpisodeMinSalience, cfg.EpisodeMaxPerDay)
 	runner := worker.New(worker.Deps{
 		Proposals: repos.ActionProposals,
-		Learning:  learningapp.NewService(repos.Beliefs, repos.PromptVersions, repos.DailySummaries),
+		Learning:  learning,
 		Users:     usersapp.NewService(repos.Users, repos.Profiles, repos.AISettings),
 		UserIDs:   repos.Users,
 		Model:     model,

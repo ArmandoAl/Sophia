@@ -57,7 +57,10 @@ class ChatMessageCubit extends Cubit<ChatMessageState> {
     try {
       final response = await _repository.sendMessage(
         conversation.id,
-        SendConversationMessageRequest(content: content),
+        SendConversationMessageRequest(
+          content: content,
+          activeContext: state.manualContext,
+        ),
       );
       final newMessages = [
         _messageFromBackend(
@@ -73,6 +76,8 @@ class ChatMessageCubit extends Cubit<ChatMessageState> {
           messages: newMessages,
           isTyping: false,
           clearError: true,
+          activeEntity: response.activeEntity,
+          contextChanged: response.contextChanged,
         ),
       );
     } catch (e) {
@@ -84,6 +89,26 @@ class ChatMessageCubit extends Cubit<ChatMessageState> {
 
   void toggleListening() {
     emit(state.copyWith(isListening: !state.isListening));
+  }
+
+  void setManualContext(EntityReference entity) {
+    emit(
+      state.copyWith(
+        activeEntity: entity,
+        manualContext: entity.scopeKey,
+        contextChanged: true,
+      ),
+    );
+  }
+
+  void useAutomaticContext() {
+    emit(
+      state.copyWith(
+        clearActiveEntity: true,
+        clearManualContext: true,
+        contextChanged: false,
+      ),
+    );
   }
 
   ChatMessage _messageFromBackend(

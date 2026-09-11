@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:flutter/services.dart';
 
 import '../../../../core/config/feature_flags.dart';
 import '../../../../core/di/service_locator.dart';
@@ -35,7 +34,7 @@ class _NotificationsView extends StatelessWidget {
                 padding: EdgeInsets.all(SophiaSpace.lg),
                 child: Column(
                   children: [
-                    ContentSkeleton(height: SophiaSpace.xxl),
+                    ContentSkeleton(),
                     SizedBox(height: SophiaSpace.lg),
                     ContentSkeleton(),
                   ],
@@ -44,65 +43,180 @@ class _NotificationsView extends StatelessWidget {
             );
           }
           return MotionSwap(
-            child: ListView(
+            child: Align(
               key: const ValueKey('notifications-content'),
-              padding: const EdgeInsets.all(SophiaSpace.lg),
-              children: [
-                SwitchListTile(
-                  value: state.currentDeviceId != null,
-                  onChanged: enabled
-                      ? (value) async {
-                          HapticFeedback.lightImpact();
-                          if (value) {
-                            await context.read<NotificationsCubit>().register();
-                          } else if (state.currentDeviceId case final id?) {
-                            await context.read<NotificationsCubit>().remove(id);
-                          }
-                        }
-                      : null,
-                  title: const Text('Notificaciones en este dispositivo'),
-                  subtitle: Text(
-                    enabled
-                        ? 'Registra o quita este dispositivo.'
-                        : 'Esta función todavía está desactivada.',
-                  ),
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: SophiaSize.contentMaxWidth,
                 ),
-                if (state.error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: SophiaSpace.sm),
-                    child: Text(
-                      state.error!,
-                      style: TextStyle(color: context.colors.critical),
+                child: ListView(
+                  padding: const EdgeInsets.all(SophiaSpace.lg),
+                  children: [
+                    Text(
+                      'Elige con calma dónde puede avisarte Sofía.',
+                      style: TextStyle(color: context.colors.softInk),
                     ),
-                  ),
-                const SizedBox(height: SophiaSpace.lg),
-                Text(
-                  'Dispositivos registrados',
-                  style: Theme.of(context).textTheme.titleMedium,
+                    const SizedBox(height: SophiaSpace.lg),
+                    Text(
+                      'Este dispositivo',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: SophiaSpace.xs),
+                    Container(
+                      padding: const EdgeInsets.all(SophiaSpace.md),
+                      decoration: BoxDecoration(
+                        color: context.colors.elevated,
+                        border: Border.all(color: context.colors.line),
+                        borderRadius: BorderRadius.circular(SophiaRadius.card),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Notificaciones en este dispositivo',
+                                ),
+                                const SizedBox(height: SophiaSpace.xxs),
+                                Text(
+                                  enabled
+                                      ? 'Puedes cambiarlo cuando quieras.'
+                                      : 'Esta función todavía está desactivada.',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: SophiaSpace.md),
+                          SophiaSwitch(
+                            value: state.currentDeviceId != null,
+                            semanticLabel: 'Notificaciones en este dispositivo',
+                            onChanged: enabled
+                                ? (value) async {
+                                    if (value) {
+                                      await context
+                                          .read<NotificationsCubit>()
+                                          .register();
+                                    } else if (state.currentDeviceId
+                                        case final id?) {
+                                      await context
+                                          .read<NotificationsCubit>()
+                                          .remove(id);
+                                    }
+                                  }
+                                : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (state.error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: SophiaSpace.sm),
+                        child: Text(
+                          state.error!,
+                          style: TextStyle(color: context.colors.critical),
+                        ),
+                      ),
+                    const SizedBox(height: SophiaSpace.xl),
+                    Text(
+                      'Dispositivos registrados',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                    const SizedBox(height: SophiaSpace.xs),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: SophiaSpace.md,
+                      ),
+                      decoration: BoxDecoration(
+                        color: context.colors.elevated,
+                        border: Border.all(color: context.colors.line),
+                        borderRadius: BorderRadius.circular(SophiaRadius.card),
+                      ),
+                      child: state.devices.isEmpty
+                          ? Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: SophiaSpace.lg,
+                              ),
+                              child: Text(
+                                'No hay dispositivos registrados.',
+                                style: TextStyle(color: context.colors.softInk),
+                              ),
+                            )
+                          : Column(
+                              children: [
+                                for (
+                                  var index = 0;
+                                  index < state.devices.length;
+                                  index++
+                                ) ...[
+                                  _DeviceRow(
+                                    platform: state.devices[index].platform,
+                                    createdAt: state.devices[index].createdAt,
+                                    onRemove: () => context
+                                        .read<NotificationsCubit>()
+                                        .remove(state.devices[index].id),
+                                  ),
+                                  if (index < state.devices.length - 1)
+                                    Divider(color: context.colors.line),
+                                ],
+                              ],
+                            ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: SophiaSpace.xs),
-                if (!state.loading && state.devices.isEmpty)
-                  const Text('No hay dispositivos registrados.'),
-                for (final device in state.devices)
-                  ListTile(
-                    leading: const Icon(Icons.phone_iphone),
-                    title: Text(device.platform),
-                    subtitle: Text('Alta: ${_date(device.createdAt)}'),
-                    trailing: IconButton(
-                      tooltip: 'Quitar dispositivo',
-                      icon: const Icon(Icons.close),
-                      onPressed: () =>
-                          context.read<NotificationsCubit>().remove(device.id),
-                    ),
-                  ),
-              ],
+              ),
             ),
           );
         },
       ),
     );
   }
-
-  String _date(DateTime value) =>
-      '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';
 }
+
+class _DeviceRow extends StatelessWidget {
+  const _DeviceRow({
+    required this.platform,
+    required this.createdAt,
+    required this.onRemove,
+  });
+
+  final String platform;
+  final DateTime createdAt;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: SophiaSpace.sm),
+    child: Row(
+      children: [
+        Icon(Icons.devices_outlined, color: context.colors.softInk),
+        const SizedBox(width: SophiaSpace.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(platform),
+              Text(
+                'Alta: ${_date(createdAt)}',
+                style: SophiaType.dataLabel(context),
+              ),
+            ],
+          ),
+        ),
+        TactileButton(
+          semanticLabel: 'Quitar dispositivo $platform',
+          onPressed: onRemove,
+          child: const Padding(
+            padding: EdgeInsets.all(SophiaSpace.sm),
+            child: Icon(Icons.close),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+String _date(DateTime value) =>
+    '${value.day.toString().padLeft(2, '0')}/${value.month.toString().padLeft(2, '0')}/${value.year}';

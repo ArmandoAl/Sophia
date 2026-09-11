@@ -59,6 +59,7 @@ func BuildModules(cfg config.Config, repositories *Repositories) (*Modules, erro
 	memoryService := memoryapp.NewService(repositories.Memories, usersService, embeddingProvider)
 	learningService := learningapp.NewService(repositories.Beliefs, repositories.PromptVersions, repositories.DailySummaries)
 	learningService.SetContextRepository(repositories.UserContexts)
+	learningService.SetEntityCandidateRepository(repositories.EntityCandidates, cfg.EntityPromotionThreshold)
 	learningService.SetEmbeddingProvider(embeddingProvider, cfg.BeliefDedupeThreshold)
 	notificationsService := notificationsapp.NewService(repositories.DeviceTokens)
 	toolsService := toolsapp.NewService(repositories.Tools)
@@ -81,6 +82,8 @@ func BuildModules(cfg config.Config, repositories *Repositories) (*Modules, erro
 	if err != nil {
 		return nil, err
 	}
+	learningService.SetEpisodeStore(repositories.Episodes, modelClient, cfg.EpisodeMinSalience, cfg.EpisodeMaxPerDay)
+	contextBuilder.SetExtractor(modelClient)
 	planner := runtimeapp.NewPlanner(modelClient)
 	safety := runtimeapp.NewSafetyPolicy()
 	safety.SetAutonomy(actionsService, cfg.AutonomyThreshold)

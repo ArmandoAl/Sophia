@@ -9,6 +9,9 @@ class ChatMessageState extends Equatable {
   final bool isListening; // Para la animación de ondas de voz (screen3)
   final bool isTyping; // Para mostrar "Sophia is typing..."
   final String? errorMessage;
+  final EntityReference? activeEntity;
+  final String? manualContext;
+  final bool contextChanged;
 
   const ChatMessageState({
     this.conversation,
@@ -17,6 +20,9 @@ class ChatMessageState extends Equatable {
     this.isListening = false,
     this.isTyping = false,
     this.errorMessage,
+    this.activeEntity,
+    this.manualContext,
+    this.contextChanged = false,
   });
 
   ChatMessageState copyWith({
@@ -27,6 +33,11 @@ class ChatMessageState extends Equatable {
     bool? isTyping,
     String? errorMessage,
     bool clearError = false,
+    EntityReference? activeEntity,
+    String? manualContext,
+    bool? contextChanged,
+    bool clearActiveEntity = false,
+    bool clearManualContext = false,
   }) {
     return ChatMessageState(
       conversation: conversation ?? this.conversation,
@@ -35,6 +46,13 @@ class ChatMessageState extends Equatable {
       isListening: isListening ?? this.isListening,
       isTyping: isTyping ?? this.isTyping,
       errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      activeEntity: clearActiveEntity
+          ? null
+          : activeEntity ?? this.activeEntity,
+      manualContext: clearManualContext
+          ? null
+          : manualContext ?? this.manualContext,
+      contextChanged: contextChanged ?? this.contextChanged,
     );
   }
 
@@ -46,5 +64,8 @@ class ChatMessageState extends Equatable {
     isListening,
     isTyping,
     errorMessage,
+    activeEntity,
+    manualContext,
+    contextChanged,
   ];
 }

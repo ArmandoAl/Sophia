@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/design_tokens.dart';
-import '../../../../core/theme/motion.dart';
 import '../../../../core/widgets/motion/motion_widgets.dart';
 import '../../../contexts/presentation/cubit/contexts_cubit.dart';
 import '../../domain/models.dart';
@@ -163,121 +162,120 @@ class _BeliefCardState extends State<_BeliefCard> {
         ? const SizedBox.shrink(key: ValueKey('retired'))
         : Container(
             key: const ValueKey('belief'),
-      margin: const EdgeInsets.only(bottom: SophiaSpace.sm),
-      padding: const EdgeInsets.all(SophiaSpace.md),
-      decoration: BoxDecoration(
-        color: context.colors.elevated,
-        border: Border.all(color: context.colors.line),
-        borderRadius: BorderRadius.circular(SophiaRadius.card),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Hero(
-                  tag: 'belief-${widget.belief.id}',
-                  transitionOnUserGestures: true,
-                  child: Material(
-                    color: context.colors.surface.withValues(alpha: 0),
-                    child: Text(
-                      'Creo que ${_tentative(widget.belief.statement)}',
-                      style: Theme.of(context).textTheme.bodyLarge,
+            margin: const EdgeInsets.only(bottom: SophiaSpace.sm),
+            padding: const EdgeInsets.all(SophiaSpace.md),
+            decoration: BoxDecoration(
+              color: context.colors.elevated,
+              border: Border.all(color: context.colors.line),
+              borderRadius: BorderRadius.circular(SophiaRadius.card),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Hero(
+                        tag: 'belief-${widget.belief.id}',
+                        transitionOnUserGestures: true,
+                        child: Material(
+                          color: context.colors.surface.withValues(alpha: 0),
+                          child: Text(
+                            'Creo que ${_tentative(widget.belief.statement)}',
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    if (widget.belief.promptSlot == 'core')
+                      Tooltip(
+                        message: 'Influye en cómo se comporta Sofía hoy',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: SophiaSpace.xs,
+                            vertical: SophiaSpace.xxs,
+                          ),
+                          decoration: BoxDecoration(
+                            color: context.colors.accent.withValues(
+                              alpha: SophiaOpacity.subtle,
+                            ),
+                            borderRadius: BorderRadius.circular(
+                              SophiaRadius.control,
+                            ),
+                          ),
+                          child: Text(
+                            'Guía a Sofía hoy',
+                            style: Theme.of(context).textTheme.labelMedium
+                                ?.copyWith(color: context.colors.accent),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              if (widget.belief.promptSlot == 'core')
+                const SizedBox(height: SophiaSpace.md),
                 Tooltip(
-                  message: 'Influye en cómo se comporta Sofía hoy',
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: SophiaSpace.xs,
-                      vertical: SophiaSpace.xxs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: context.colors.accent.withValues(
-                        alpha: SophiaOpacity.subtle,
-                      ),
-                      borderRadius: BorderRadius.circular(
-                        SophiaRadius.control,
-                      ),
-                    ),
-                    child: Text(
-                      'Guía a Sofía hoy',
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  message:
+                      'Confianza ${(widget.belief.decayedConfidence * 100).round()}%',
+                  child: Semantics(
+                    label:
+                        '${_confidenceLabel(widget.belief.decayedConfidence)}. Mantén pulsado para ver el porcentaje.',
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(SophiaRadius.control),
+                      child: LinearProgressIndicator(
+                        value: widget.belief.decayedConfidence.clamp(0, 1),
+                        minHeight: SophiaSpace.xxs,
+                        backgroundColor: context.colors.line,
                         color: context.colors.accent,
                       ),
                     ),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: SophiaSpace.md),
-          Tooltip(
-            message:
-                'Confianza ${(widget.belief.decayedConfidence * 100).round()}%',
-            child: Semantics(
-              label:
-                  '${_confidenceLabel(widget.belief.decayedConfidence)}. Mantén pulsado para ver el porcentaje.',
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(SophiaRadius.control),
-                child: LinearProgressIndicator(
-                  value: widget.belief.decayedConfidence.clamp(0, 1),
-                  minHeight: SophiaSpace.xxs,
-                  backgroundColor: context.colors.line,
-                  color: context.colors.accent,
+                const SizedBox(height: SophiaSpace.xs),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _origin(widget.belief.trustTier),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: context.colors.softInk,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _confidenceLabel(widget.belief.decayedConfidence),
+                      style: Theme.of(context).textTheme.labelMedium,
+                    ),
+                  ],
                 ),
-              ),
+                const SizedBox(height: SophiaSpace.sm),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TactileButton(
+                      semanticLabel: 'Indicar que esta creencia no es cierta',
+                      onPressed: _retire,
+                      child: const Padding(
+                        padding: EdgeInsets.all(SophiaSpace.sm),
+                        child: Text('No es cierto'),
+                      ),
+                    ),
+                    TactileButton(
+                      semanticLabel: 'Corregir esta creencia',
+                      onPressed: _edit,
+                      child: Padding(
+                        padding: const EdgeInsets.all(SophiaSpace.sm),
+                        child: Text(
+                          'Corregir',
+                          style: TextStyle(color: context.colors.accent),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: SophiaSpace.xs),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _origin(widget.belief.trustTier),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: context.colors.softInk,
-                  ),
-                ),
-              ),
-              Text(
-                _confidenceLabel(widget.belief.decayedConfidence),
-                style: Theme.of(context).textTheme.labelMedium,
-              ),
-            ],
-          ),
-          const SizedBox(height: SophiaSpace.sm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              TactileButton(
-                semanticLabel: 'Indicar que esta creencia no es cierta',
-                onPressed: _retire,
-                child: const Padding(
-                  padding: EdgeInsets.all(SophiaSpace.sm),
-                  child: Text('No es cierto'),
-                ),
-              ),
-              TactileButton(
-                semanticLabel: 'Corregir esta creencia',
-                onPressed: _edit,
-                child: Padding(
-                  padding: const EdgeInsets.all(SophiaSpace.sm),
-                  child: Text(
-                    'Corregir',
-                    style: TextStyle(color: context.colors.accent),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
   );
 
   Future<void> _retire() async {
@@ -329,10 +327,39 @@ class _BeliefCardState extends State<_BeliefCard> {
         false;
     if (!confirmed || !mounted) return;
     setState(() => retiring = true);
-    await Future<void>.delayed(
-      SophiaMotion.resolve(context, SophiaMotion.short),
+    var undone = false;
+    late ScaffoldFeatureController<SnackBar, SnackBarClosedReason> notice;
+    notice = ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Expanded(child: Text('Creencia retirada.')),
+            TactileButton(
+              onPressed: () {
+                undone = true;
+                notice.close();
+                if (mounted) setState(() => retiring = false);
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(SophiaSpace.xs),
+                child: Text('Deshacer'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
-    await cubit.retire(widget.belief.id);
+    await notice.closed;
+    if (undone || !mounted) return;
+    try {
+      await cubit.retire(widget.belief.id);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => retiring = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pude retirarla. Inténtalo de nuevo.')),
+      );
+    }
   }
 
   Future<void> _edit() async {

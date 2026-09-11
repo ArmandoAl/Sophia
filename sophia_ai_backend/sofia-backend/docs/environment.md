@@ -72,6 +72,17 @@
 | `SYNTHESIS_WORKER_INTERVAL` | `1m` | no | Poll interval as a positive Go duration. |
 | `SYNTHESIS_WORKER_LEASE` | `2m` | no | Lease duration for one daily synthesis run. |
 | `SYNTHESIS_RUN_HOUR_LOCAL` | `3` | no | Local hour, from 0 through 23, when daily synthesis runs. |
+| `ENTITY_PROMOTION_THRESHOLD` | `3` | no | Mentions required before a candidate is promoted to a pending-review person. |
+
+## Episode Worker
+
+| Variable | Default | Required | Description |
+| --- | --- | --- | --- |
+| `EPISODE_WORKER_ENABLED` | `false` | no | Enables nightly episodic extraction from entity conversations. |
+| `EPISODE_WORKER_INTERVAL` | `1h` | no | Poll interval as a positive Go duration. |
+| `EPISODE_RUN_HOUR_UTC` | `4` | no | UTC hour, from 0 through 23, when extraction runs. |
+| `EPISODE_MIN_SALIENCE` | `0.4` | no | Minimum salience required to persist an episode. |
+| `EPISODE_MAX_PER_DAY` | `5` | no | Maximum episodes stored per user and day. |
 
 ## Reminder Worker
 

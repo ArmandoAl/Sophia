@@ -9,13 +9,13 @@ import (
 	"sort"
 	"strings"
 	"time"
-	"unicode"
 
 	activitiesdomain "github.com/armandoalvarado/sofia-backend/internal/activities/domain"
 	actionsapp "github.com/armandoalvarado/sofia-backend/internal/ai/actions/application"
 	actionsdomain "github.com/armandoalvarado/sofia-backend/internal/ai/actions/domain"
 	"github.com/armandoalvarado/sofia-backend/internal/ai/runtime/domain"
 	insightsdomain "github.com/armandoalvarado/sofia-backend/internal/insights/domain"
+	learningapp "github.com/armandoalvarado/sofia-backend/internal/learning/application"
 	learningdomain "github.com/armandoalvarado/sofia-backend/internal/learning/domain"
 	memorydomain "github.com/armandoalvarado/sofia-backend/internal/memory/domain"
 	remindersdomain "github.com/armandoalvarado/sofia-backend/internal/reminders/domain"
@@ -29,9 +29,11 @@ const (
 	DefaultContextLimit = 5
 
 	tokenQuotaMemoriesPercent   = 40
-	tokenQuotaHistoryPercent    = 25
-	tokenQuotaActivitiesPercent = 25
-	tokenQuotaRemindersPercent  = 10
+	tokenQuotaActivitiesPercent = 40
+	tokenQuotaRemindersPercent  = 20
+	recentStateTokenCeiling     = 600
+	conversationHistoryCeiling  = 1000
+	carryForwardCharacterLimit  = 800
 )
 
 var emailRedactPattern = regexp.MustCompile(`[\w.+-]+@[\w-]+\.[\w.-]+`)
@@ -78,9 +80,16 @@ type PromptBaseReader interface {
 }
 
 type LearningContextReader interface {
-	ListUserContexts(ctx context.Context, userID string) ([]*learningdomain.UserContext, error)
 	FindUserContextByScopeKey(ctx context.Context, userID, scopeKey string) (*learningdomain.UserContext, error)
+	FindUserContextByID(ctx context.Context, userID, entityID string) (*learningdomain.UserContext, error)
 	ContextBeliefStatements(ctx context.Context, userID, scopeKey string) ([]string, error)
+	ResolveEntities(ctx context.Context, userID, message string) ([]learningdomain.EntityMatch, error)
+}
+
+type EpisodicContextReader interface {
+	SearchEpisodes(ctx context.Context, userID, entityID string, terms []string, limit int) ([]*learningdomain.Episode, error)
+	GetOpenThreads(ctx context.Context, userID string, limit int) ([]learningapp.OpenThread, error)
+	MarkOpenThreadRetaken(ctx context.Context, thread learningapp.OpenThread) error
 }
 
 type ContextBuilder struct {
@@ -91,6 +100,7 @@ type ContextBuilder struct {
 	memories   MemorySearcher
 	prompts    PromptBaseReader
 	contexts   LearningContextReader
+	extractor  domain.ModelClient
 	limit      int
 	tokenLimit int
 }
@@ -110,11 +120,19 @@ func (b *ContextBuilder) SetLearningContextReader(reader LearningContextReader) 
 	b.contexts = reader
 }
 
+func (b *ContextBuilder) SetExtractor(model domain.ModelClient) {
+	b.extractor = model
+}
+
 func (b *ContextBuilder) Build(ctx context.Context, userID, message string, activeContexts ...string) (domain.ContextSummary, error) {
-	activeContext := ""
+	state := domain.ContextBuildState{}
 	if len(activeContexts) > 0 {
-		activeContext = activeContexts[0]
+		state.ExplicitActiveContext = activeContexts[0]
 	}
+	return b.BuildStateful(ctx, userID, message, state)
+}
+
+func (b *ContextBuilder) BuildStateful(ctx context.Context, userID, message string, state domain.ContextBuildState) (domain.ContextSummary, error) {
 	me, err := b.users.GetMe(userID)
 	if err != nil {
 		return domain.ContextSummary{}, err
@@ -163,16 +181,91 @@ func (b *ContextBuilder) Build(ctx context.Context, userID, message string, acti
 	if err != nil {
 		return domain.ContextSummary{}, err
 	}
-	contextValue, err := b.resolveActiveContext(ctx, userID, activeContext)
-	if err != nil {
-		return domain.ContextSummary{}, err
-	}
-	if contextValue != nil {
-		beliefs, err := b.contexts.ContextBeliefStatements(ctx, userID, contextValue.ScopeKey())
+	var contextValue *learningdomain.UserContext
+	if b.contexts != nil {
+		explicit := strings.TrimSpace(state.ExplicitActiveContext)
+		if explicit != "" {
+			contextValue, err = b.contexts.FindUserContextByScopeKey(ctx, userID, explicit)
+		} else if strings.TrimSpace(state.CurrentEntityID) != "" {
+			contextValue, err = b.contexts.FindUserContextByID(ctx, userID, state.CurrentEntityID)
+		} else {
+			contextValue, err = b.resolveActiveContext(ctx, userID, "")
+		}
 		if err != nil {
 			return domain.ContextSummary{}, err
 		}
-		summary.ActiveContext = &domain.ActiveContext{ScopeKey: contextValue.ScopeKey(), Label: contextValue.Label, Beliefs: beliefs}
+		matches, err := b.contexts.ResolveEntities(ctx, userID, message)
+		if err != nil {
+			return domain.ContextSummary{}, err
+		}
+		if explicit == "" {
+			if target := automaticContextTarget(matches, message, state.CurrentEntityID); target != nil {
+				contextValue = target
+			}
+		}
+		if contextValue != nil {
+			summary.ContextChanged = state.CurrentEntityID != "" && state.CurrentEntityID != contextValue.ID
+			beliefs, err := b.contexts.ContextBeliefStatements(ctx, userID, contextValue.ScopeKey())
+			if err != nil {
+				return domain.ContextSummary{}, err
+			}
+			summary.ActiveContext = &domain.ActiveContext{EntityID: contextValue.ID, ScopeKey: contextValue.ScopeKey(), Label: contextValue.Label, Relationship: contextValue.Relationship, Beliefs: beliefs}
+			summary.ActiveEntity = &domain.EntityReference{ID: contextValue.ID, ScopeKey: contextValue.ScopeKey(), Label: contextValue.Label, Relationship: contextValue.Relationship}
+			summary.CarryForwardEntity = contextValue.ID
+			if summary.ContextChanged {
+				summary.CarryForward, err = b.generateCarryForward(ctx, userID, state.History)
+				if err != nil {
+					return domain.ContextSummary{}, err
+				}
+			} else if state.CarryForwardEntity == contextValue.ID {
+				summary.CarryForward = state.CarryForward
+			}
+			if episodic, ok := b.contexts.(EpisodicContextReader); ok {
+				episodes, err := episodic.SearchEpisodes(ctx, userID, contextValue.ID, memorydomain.ExtractTerms(message, 12), learningdomain.DefaultEpisodeSearchLimit)
+				if err != nil {
+					return domain.ContextSummary{}, err
+				}
+				for _, episode := range episodes {
+					summary.RecentEpisodes = append(summary.RecentEpisodes, domain.EpisodeSummary{ID: episode.ID, OccurredAt: episode.OccurredAt, Summary: episode.Summary, Topics: episode.Topics, Salience: episode.Salience})
+				}
+				if !state.OpenThreadRetaken {
+					threads, err := episodic.GetOpenThreads(ctx, userID, 1)
+					if err != nil {
+						return domain.ContextSummary{}, err
+					}
+					if len(threads) > 0 {
+						thread := threads[0]
+						summary.OpenThreads = []domain.OpenThreadSummary{{ID: thread.ID, Source: thread.Source, EntityIDs: thread.EntityIDs, Summary: thread.Summary}}
+						if err := episodic.MarkOpenThreadRetaken(ctx, thread); err != nil {
+							return domain.ContextSummary{}, err
+						}
+						summary.OpenThreadRetaken = true
+					}
+				}
+			}
+		}
+		beliefsByEntity := make(map[string][]string)
+		for _, match := range matches {
+			if contextValue != nil && match.Entity.ID == contextValue.ID && !match.Ambiguous {
+				continue
+			}
+			beliefs, ok := beliefsByEntity[match.Entity.ID]
+			if !ok {
+				beliefs, err = b.contexts.ContextBeliefStatements(ctx, userID, match.Entity.ScopeKey())
+				if err != nil {
+					return domain.ContextSummary{}, err
+				}
+				beliefsByEntity[match.Entity.ID] = beliefs
+			}
+			summary.EntityContexts = append(summary.EntityContexts, domain.EntityContext{
+				EntityID: match.Entity.ID, ScopeKey: match.Entity.ScopeKey(), Label: match.Entity.Label,
+				Relationship: match.Entity.Relationship, Mention: match.Mention, Start: match.Start, End: match.End,
+				Ambiguous: match.Ambiguous, Beliefs: beliefs,
+			})
+			if match.Ambiguous {
+				summary.EntityInstruction = "Two or more entities match the same mention. Ask the user which person they mean before using candidate facts or making assumptions."
+			}
+		}
 	}
 
 	var due []*remindersdomain.Reminder
@@ -196,11 +289,10 @@ func (b *ContextBuilder) Build(ctx context.Context, userID, message string, acti
 		"total_reflections": insights.TotalReflections,
 	}
 
-	maxTokens := summary.TokenBudget.MaxApproxTokens
+	maxTokens := minInt(recentStateTokenCeiling, summary.TokenBudget.MaxApproxTokens)
 	memoriesQuota := quotaTokens(maxTokens, tokenQuotaMemoriesPercent)
-	historyQuota := quotaTokens(maxTokens, tokenQuotaHistoryPercent)
 	activitiesQuota := quotaTokens(maxTokens, tokenQuotaActivitiesPercent)
-	remindersQuota := maxTokens - memoriesQuota - historyQuota - activitiesQuota
+	remindersQuota := maxTokens - memoriesQuota - activitiesQuota
 
 	leftover := chargeBudget(&summary.TokenBudget, approximateJSONTokens(summary.InsightsSummary), memoriesQuota)
 
@@ -218,11 +310,10 @@ func (b *ContextBuilder) Build(ctx context.Context, userID, message string, acti
 		summary.MemoryIncluded = true
 	}
 
-	historyReserve := historyQuota + leftover
-	activityCap := minInt(activitiesQuota, remainingAfterReserve(&summary.TokenBudget, historyReserve))
+	activityCap := minInt(activitiesQuota, remainingAfterReserve(&summary.TokenBudget, 0))
 	summary.RecentActivities, leftover = fitItems(summarizeActivities(activities), &summary.TokenBudget, activityCap)
 	if summary.RemindersIncluded {
-		reminderCap := minInt(remindersQuota+leftover, remainingAfterReserve(&summary.TokenBudget, historyReserve))
+		reminderCap := minInt(remindersQuota+leftover, remainingAfterReserve(&summary.TokenBudget, 0))
 		summary.DueReminders, _ = fitItems(summarizeReminders(due), &summary.TokenBudget, reminderCap)
 	}
 
@@ -237,6 +328,72 @@ func (b *ContextBuilder) Build(ctx context.Context, userID, message string, acti
 	return summary, nil
 }
 
+func automaticContextTarget(matches []learningdomain.EntityMatch, message, currentEntityID string) *learningdomain.UserContext {
+	counts := make(map[string]int)
+	entities := make(map[string]*learningdomain.UserContext)
+	for _, match := range matches {
+		if match.Ambiguous || match.Entity == nil || match.Entity.ID == currentEntityID {
+			continue
+		}
+		counts[match.Entity.ID]++
+		entities[match.Entity.ID] = match.Entity
+	}
+	var target *learningdomain.UserContext
+	for entityID, count := range counts {
+		if count < 2 && !directedEntityMessage(message) {
+			continue
+		}
+		if target != nil && target.ID != entityID {
+			return nil
+		}
+		target = entities[entityID]
+	}
+	return target
+}
+
+func directedEntityMessage(message string) bool {
+	if strings.Contains(message, "?") || strings.Contains(message, "¿") {
+		return true
+	}
+	message = strings.ToLower(strings.TrimSpace(message))
+	for _, prefix := range []string{"cuéntame", "cuentame", "dime", "ayúdame", "ayudame", "hablemos", "quiero", "necesito", "explícame", "explicame", "recuérdame", "recuerdame", "qué sabes", "que sabes", "cómo", "como", "por qué", "por que"} {
+		if strings.HasPrefix(message, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *ContextBuilder) generateCarryForward(ctx context.Context, userID string, history []domain.Turn) (string, error) {
+	if b.extractor == nil || len(history) == 0 {
+		return "", nil
+	}
+	payload, err := json.Marshal(map[string]any{
+		"task":                 "carry_forward",
+		"instructions":         "Summarize what the conversation was discussing before the context change in 2 or 3 concise sentences.",
+		"output_schema":        map[string]any{"type": "object", "required": []string{"carry_forward"}, "properties": map[string]any{"carry_forward": map[string]any{"type": "string"}}},
+		"conversation_history": history,
+	})
+	if err != nil {
+		return "", err
+	}
+	response, err := b.extractor.Generate(ctx, domain.ModelRequest{UserID: userID, Message: string(payload), Task: domain.TaskExtract})
+	if err != nil {
+		return "", err
+	}
+	text := strings.TrimSpace(response.AssistantMessage)
+	var output struct {
+		CarryForward string `json:"carry_forward"`
+	}
+	if json.Unmarshal([]byte(text), &output) == nil && strings.TrimSpace(output.CarryForward) != "" {
+		text = strings.TrimSpace(output.CarryForward)
+	}
+	if len([]rune(text)) > carryForwardCharacterLimit {
+		text = string([]rune(text)[:carryForwardCharacterLimit])
+	}
+	return text, nil
+}
+
 func (b *ContextBuilder) resolveActiveContext(ctx context.Context, userID, explicit string) (*learningdomain.UserContext, error) {
 	if b.contexts == nil {
 		return nil, nil
@@ -244,40 +401,22 @@ func (b *ContextBuilder) resolveActiveContext(ctx context.Context, userID, expli
 	if strings.TrimSpace(explicit) != "" {
 		return b.contexts.FindUserContextByScopeKey(ctx, userID, explicit)
 	}
-	contexts, err := b.contexts.ListUserContexts(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
 	activities, err := b.activities.ListActivities(ctx, activitiesdomain.ListFilter{UserID: userID, Status: activitiesdomain.StatusActive, Limit: b.limit})
 	if err != nil {
 		return nil, err
 	}
 	for _, activity := range activities {
-		for _, contextValue := range contexts {
-			if contextValue != nil && contextValue.Active && activityMentionsContext(activity, contextValue) {
-				return contextValue, nil
-			}
+		text := strings.ToLower(strings.Join(append([]string{activity.Title}, activity.Tags...), " "))
+		matches, err := b.contexts.ResolveEntities(ctx, userID, text)
+		if err != nil {
+			return nil, err
+		}
+		if len(matches) == 1 && !matches[0].Ambiguous {
+			return matches[0].Entity, nil
 		}
 	}
 	// Model-inferred context is intentionally deferred until it can be resolved safely.
 	return nil, nil
-}
-
-func activityMentionsContext(activity *activitiesdomain.Activity, contextValue *learningdomain.UserContext) bool {
-	values := append([]string{contextValue.Slug}, contextValue.Aliases...)
-	haystack := normalizeMention(strings.Join(append([]string{activity.Title}, activity.Tags...), " "))
-	for _, value := range values {
-		if strings.Contains(" "+haystack+" ", " "+normalizeMention(value)+" ") {
-			return true
-		}
-	}
-	return false
-}
-
-func normalizeMention(value string) string {
-	return strings.Join(strings.FieldsFunc(strings.ToLower(value), func(r rune) bool {
-		return !unicode.IsLetter(r) && !unicode.IsNumber(r)
-	}), " ")
 }
 
 type ToolSelector struct {
@@ -380,6 +519,10 @@ type RuntimeService struct {
 	audit          AuditRecorder
 }
 
+type statefulContextBuilder interface {
+	BuildStateful(ctx context.Context, userID, message string, state domain.ContextBuildState) (domain.ContextSummary, error)
+}
+
 func NewRuntimeService(contextBuilder domain.ContextBuilder, toolSelector domain.ToolSelector, planner domain.Planner, safety domain.SafetyPolicy, actions ActionProposalCreator) *RuntimeService {
 	return &RuntimeService{contextBuilder: contextBuilder, toolSelector: toolSelector, planner: planner, safety: safety, actions: actions}
 }
@@ -397,7 +540,17 @@ func (s *RuntimeService) HandleMessage(ctx context.Context, request domain.Runti
 		return nil, domain.ErrInvalidMessage
 	}
 
-	contextSummary, err := s.contextBuilder.Build(ctx, request.UserID, request.Message, request.ActiveContext)
+	var contextSummary domain.ContextSummary
+	var err error
+	if builder, ok := s.contextBuilder.(statefulContextBuilder); ok {
+		contextSummary, err = builder.BuildStateful(ctx, request.UserID, request.Message, domain.ContextBuildState{
+			ExplicitActiveContext: request.ActiveContext, CurrentEntityID: request.CurrentEntityID,
+			CarryForward: request.CarryForward, CarryForwardEntity: request.CarryForwardEntity,
+			ConversationID: request.ConversationID, History: request.History, OpenThreadRetaken: request.OpenThreadRetaken,
+		})
+	} else {
+		contextSummary, err = s.contextBuilder.Build(ctx, request.UserID, request.Message, request.ActiveContext)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +574,7 @@ func (s *RuntimeService) HandleMessage(ctx context.Context, request domain.Runti
 		"message_hash": messageFingerprint(request.Message),
 	})
 	providerStarted := time.Now()
-	history := fitHistory(request.History, &contextSummary.TokenBudget)
+	history := fitHistory(request.History, &contextSummary.TokenBudget, conversationHistoryCeiling)
 	modelResponse, err := s.planner.Plan(ctx, domain.ModelRequest{
 		UserID:     request.UserID,
 		Message:    request.Message,
@@ -456,11 +609,15 @@ func (s *RuntimeService) HandleMessage(ctx context.Context, request domain.Runti
 	})
 
 	response := &domain.RuntimeResponse{
-		Mode:             domain.ModeDryRun,
-		RequestID:        request.RequestID,
-		ContextSummary:   contextSummary,
-		AvailableTools:   tools,
-		AssistantMessage: modelResponse.AssistantMessage,
+		Mode:              domain.ModeDryRun,
+		RequestID:         request.RequestID,
+		ContextSummary:    contextSummary,
+		AvailableTools:    tools,
+		AssistantMessage:  modelResponse.AssistantMessage,
+		ActiveEntity:      contextSummary.ActiveEntity,
+		ContextChanged:    contextSummary.ContextChanged,
+		CarryForward:      contextSummary.CarryForward,
+		OpenThreadRetaken: contextSummary.OpenThreadRetaken,
 		Observability: domain.RuntimeObservability{
 			ProviderLatencyMS:   modelLatencyMillis(providerLatency),
 			PlannedActionsCount: len(modelResponse.PlannedActions),
@@ -633,7 +790,7 @@ func fitItems(items []domain.ItemSummary, budget *domain.TokenBudget, cap int) (
 	return result, remaining
 }
 
-func fitHistory(turns []domain.Turn, budget *domain.TokenBudget) []domain.Turn {
+func fitHistory(turns []domain.Turn, budget *domain.TokenBudget, ceiling int) []domain.Turn {
 	if len(turns) == 0 {
 		return []domain.Turn{}
 	}
@@ -643,6 +800,9 @@ func fitHistory(turns []domain.Turn, budget *domain.TokenBudget) []domain.Turn {
 		if available < 0 {
 			available = 0
 		}
+	}
+	if ceiling > 0 && available > ceiling {
+		available = ceiling
 	}
 	start := len(turns)
 	used := 0

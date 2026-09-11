@@ -15,12 +15,16 @@ class SettingsPage extends StatelessWidget {
     appBar: AppBar(
       title: const Text('Ajustes'),
       actions: [
-        IconButton(
+        TactileButton(
           key: const Key('settings_logout'),
-          tooltip: 'Cerrar sesión',
+          semanticLabel: 'Cerrar sesión',
           onPressed: context.read<SessionCubit>().logout,
-          icon: const Icon(Icons.logout),
+          child: const Padding(
+            padding: EdgeInsets.all(SophiaSpace.sm),
+            child: Icon(Icons.logout),
+          ),
         ),
+        const SizedBox(width: SophiaSpace.xs),
       ],
     ),
     body: ListView(
@@ -79,6 +83,14 @@ class SettingsPage extends StatelessWidget {
             ),
             _row(
               context,
+              key: const Key('settings_entities'),
+              icon: Icons.diversity_3_outlined,
+              title: 'Personas y grupos',
+              subtitle: 'Revisa lo que recuerdas de tu gente',
+              route: '/entities',
+            ),
+            _row(
+              context,
               icon: Icons.forum_outlined,
               title: 'Importar conversaciones',
               subtitle: 'Revisa lotes procesados por API',
@@ -123,11 +135,11 @@ class SettingsPage extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(Icons.logout, color: context.colors.critical),
+                Icon(Icons.logout, color: context.colors.softInk),
                 const SizedBox(width: SophiaSpace.sm),
                 Text(
                   'Cerrar sesión',
-                  style: TextStyle(color: context.colors.critical),
+                  style: TextStyle(color: context.colors.softInk),
                 ),
               ],
             ),
@@ -146,7 +158,7 @@ class SettingsPage extends StatelessWidget {
     required String route,
   }) => TactileButton(
     key: key,
-    onPressed: () => context.go(route),
+    onPressed: () => context.push(route),
     child: Padding(
       padding: const EdgeInsets.symmetric(vertical: SophiaSpace.sm),
       child: Row(

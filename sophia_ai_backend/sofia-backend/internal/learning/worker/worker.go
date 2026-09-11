@@ -175,6 +175,14 @@ func New(deps Deps, options Options) *Worker {
 }
 
 func (w *Worker) RunOnce(ctx context.Context) (RunResult, error) {
+	if w.deps.Learning != nil {
+		if _, err := w.deps.Learning.ArchiveExpiredStates(ctx, w.options.Now()); err != nil {
+			return RunResult{}, err
+		}
+		if _, err := w.deps.Learning.ArchiveStaleEpisodes(ctx, w.options.Now()); err != nil {
+			return RunResult{}, err
+		}
+	}
 	if w.deps.UserIDs == nil {
 		return RunResult{}, nil
 	}
@@ -191,6 +199,11 @@ func (w *Worker) RunOnce(ctx context.Context) (RunResult, error) {
 		now := w.options.Now().In(loc)
 		if now.Hour() != w.options.RunHourLocal {
 			result.Skipped++
+			continue
+		}
+		if _, err := w.deps.Learning.PromoteEntityCandidates(ctx, userID, now); err != nil {
+			w.logf("entity candidate maintenance failed user=%s err=%v", userID, err)
+			result.Failed++
 			continue
 		}
 		today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
@@ -536,12 +549,17 @@ func buildSynthesisMessage(beliefs []*learningdomain.Belief, contexts []*learnin
 			"prompt_slot":         belief.PromptSlot,
 			"scope":               belief.EffectiveScope(),
 			"scope_key":           belief.ScopeKey,
+			"subject_type":        belief.EffectiveSubjectType(),
+			"subject_id":          belief.SubjectID,
+			"fact_kind":           belief.FactKind,
+			"valid_until":         belief.ValidUntil,
+			"follow_up_at":        belief.FollowUpAt,
 		})
 	}
 	availableContexts := make([]map[string]string, 0, len(contexts))
 	for _, contextValue := range contexts {
-		if contextValue != nil && contextValue.Active {
-			availableContexts = append(availableContexts, map[string]string{"scope_key": contextValue.ScopeKey(), "label": contextValue.Label})
+		if contextValue != nil && contextValue.CanLoadContext() {
+			availableContexts = append(availableContexts, map[string]string{"entity_id": contextValue.ID, "scope_key": contextValue.ScopeKey(), "label": contextValue.Label})
 		}
 	}
 	payload := map[string]any{

@@ -79,6 +79,48 @@ func TestDecayedConfidenceHalvesAfterHalfLife(t *testing.T) {
 	}
 }
 
+func TestTraitDoesNotDecayAfterTwoHundredDays(t *testing.T) {
+	belief, err := NewBelief("b1", "user-1", BeliefCreate{
+		Statement: "Le gusta Mon Laferte", Category: CategoryPersonal,
+		SubjectType: SubjectEntity, SubjectID: "diana", FactKind: FactKindTrait,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	belief.Confidence = 0.8
+	now := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
+	belief.LastReinforcedAt = now.Add(-200 * 24 * time.Hour)
+	if got := belief.DecayedConfidence(now); got != belief.Confidence {
+		t.Fatalf("trait confidence decayed: got %v want %v", got, belief.Confidence)
+	}
+}
+
+func TestStateRequiresValidUntil(t *testing.T) {
+	_, err := NewBelief("b1", "user-1", BeliefCreate{
+		Statement: "Busca trabajo", Category: CategoryPersonal,
+		SubjectType: SubjectEntity, SubjectID: "diana", FactKind: FactKindState,
+	})
+	if err != ErrStateValidUntil {
+		t.Fatalf("NewBelief error = %v, want %v", err, ErrStateValidUntil)
+	}
+}
+
+func TestStateDefaultsFollowUpToHalfItsLifetimeAndMarksSensitiveTopics(t *testing.T) {
+	validUntil := time.Now().UTC().Add(48 * time.Hour)
+	before := time.Now().UTC().Add(23*time.Hour + 59*time.Minute)
+	belief, err := NewBelief("belief", "user", BeliefCreate{Statement: "Está enferma", Category: CategoryPersonal, SubjectType: SubjectEntity, SubjectID: "diana", FactKind: FactKindState, ValidUntil: &validUntil})
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := time.Now().UTC().Add(24*time.Hour + time.Minute)
+	if belief.FollowUpAt == nil || belief.FollowUpAt.Before(before) || belief.FollowUpAt.After(after) {
+		t.Fatalf("follow_up_at=%v, want lifetime midpoint", belief.FollowUpAt)
+	}
+	if !belief.Sensitive {
+		t.Fatal("health state should be sensitive by default")
+	}
+}
+
 func TestSupersedeChainsWithoutDeleting(t *testing.T) {
 	belief := mustBelief(t, "Prefiere reuniones por la mañana", CategorySchedule)
 	if err := belief.Supersede("belief-2", "more specific schedule"); err != nil {

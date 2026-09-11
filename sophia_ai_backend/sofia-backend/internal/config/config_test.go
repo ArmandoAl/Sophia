@@ -197,6 +197,7 @@ func TestLoadSynthesisWorkerConfig(t *testing.T) {
 	t.Setenv("SYNTHESIS_WORKER_INTERVAL", "2m")
 	t.Setenv("SYNTHESIS_WORKER_LEASE", "90s")
 	t.Setenv("SYNTHESIS_RUN_HOUR_LOCAL", "4")
+	t.Setenv("ENTITY_PROMOTION_THRESHOLD", "5")
 
 	cfg, err := Load()
 	if err != nil {
@@ -208,7 +209,7 @@ func TestLoadSynthesisWorkerConfig(t *testing.T) {
 	if cfg.SynthesisWorkerID != "synth-a" {
 		t.Fatalf("expected synth-a, got %q", cfg.SynthesisWorkerID)
 	}
-	if cfg.SynthesisWorkerInterval != 2*time.Minute || cfg.SynthesisWorkerLease != 90*time.Second || cfg.SynthesisRunHourLocal != 4 {
+	if cfg.SynthesisWorkerInterval != 2*time.Minute || cfg.SynthesisWorkerLease != 90*time.Second || cfg.SynthesisRunHourLocal != 4 || cfg.EntityPromotionThreshold != 5 {
 		t.Fatalf("unexpected synthesis config: %+v", cfg)
 	}
 }
@@ -376,5 +377,21 @@ func TestLoadIngestionTokenBudget(t *testing.T) {
 	}
 	if cfg.IngestionMaxTokensPerBatch != 1234 {
 		t.Fatalf("got %d, want 1234", cfg.IngestionMaxTokensPerBatch)
+	}
+}
+
+func TestLoadEpisodeConfig(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("EPISODE_WORKER_ENABLED", "true")
+	t.Setenv("EPISODE_WORKER_INTERVAL", "30m")
+	t.Setenv("EPISODE_RUN_HOUR_UTC", "5")
+	t.Setenv("EPISODE_MIN_SALIENCE", "0.6")
+	t.Setenv("EPISODE_MAX_PER_DAY", "4")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.EpisodeWorkerEnabled || cfg.EpisodeWorkerInterval != 30*time.Minute || cfg.EpisodeRunHourUTC != 5 || cfg.EpisodeMinSalience != 0.6 || cfg.EpisodeMaxPerDay != 4 {
+		t.Fatalf("unexpected episode config: %+v", cfg)
 	}
 }

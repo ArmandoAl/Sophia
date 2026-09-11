@@ -119,7 +119,7 @@ func (c *Client) Generate(ctx context.Context, request runtimedomain.ModelReques
 	if request.Task == runtimedomain.TaskSynthesize || request.Task == runtimedomain.TaskExtract {
 		system = []byte(synthesisSystemPrompt())
 		if request.Task == runtimedomain.TaskExtract {
-			system = []byte("Extract only observable facts and preferences from the supplied conversations. Return JSON only with beliefs; do not infer sensitive traits.")
+			system = []byte("Follow the supplied extraction instructions and output schema exactly. Return JSON only; do not infer unsupported or sensitive information.")
 		}
 		userContent = []byte(request.Message)
 	}

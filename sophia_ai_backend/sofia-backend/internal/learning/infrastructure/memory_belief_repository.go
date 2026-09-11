@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/armandoalvarado/sofia-backend/internal/learning/domain"
 	memorydomain "github.com/armandoalvarado/sofia-backend/internal/memory/domain"
@@ -103,6 +104,22 @@ func (r *InMemoryBeliefRepository) ListActiveByScope(ctx context.Context, userID
 	return result, nil
 }
 
+func (r *InMemoryBeliefRepository) ListActiveBySubject(_ context.Context, userID, subjectType, subjectID string, limit int) ([]*domain.Belief, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := make([]*domain.Belief, 0)
+	for _, belief := range r.beliefs {
+		if belief.UserID == userID && belief.Status == domain.StatusActive && belief.EffectiveSubjectType() == subjectType && belief.SubjectID == subjectID {
+			result = append(result, cloneBelief(belief))
+		}
+	}
+	sort.SliceStable(result, func(i, j int) bool { return result[i].Confidence > result[j].Confidence })
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
+}
+
 func (r *InMemoryBeliefRepository) SearchByTerms(ctx context.Context, userID string, terms []string, limit int) ([]*domain.Belief, error) {
 	terms = memorydomain.CapSearchTerms(terms)
 	if len(terms) == 0 {
@@ -158,6 +175,51 @@ func (r *InMemoryBeliefRepository) RetireByBatchID(ctx context.Context, userID, 
 	return count, nil
 }
 
+func (r *InMemoryBeliefRepository) ReassignEntityFacts(_ context.Context, userID, sourceEntityID, targetEntityID string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for id, belief := range r.beliefs {
+		if belief.UserID == userID && belief.EffectiveSubjectType() == domain.SubjectEntity && belief.SubjectID == sourceEntityID {
+			cp := cloneBelief(belief)
+			cp.SubjectID = targetEntityID
+			r.beliefs[id] = cp
+		}
+	}
+	return nil
+}
+
+func (r *InMemoryBeliefRepository) ArchiveExpiredStates(_ context.Context, now time.Time) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	count := 0
+	for id, belief := range r.beliefs {
+		if belief.Status != domain.StatusActive || belief.FactKind != domain.FactKindState || belief.ValidUntil == nil || belief.ValidUntil.After(now) {
+			continue
+		}
+		cp := cloneBelief(belief)
+		cp.Status = domain.StatusArchived
+		r.beliefs[id] = cp
+		count++
+	}
+	return count, nil
+}
+
+func (r *InMemoryBeliefRepository) ListDueFollowUps(_ context.Context, userID string, now time.Time, limit int) ([]*domain.Belief, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	result := make([]*domain.Belief, 0)
+	for _, belief := range r.beliefs {
+		if belief.UserID == userID && belief.Status == domain.StatusActive && belief.FollowUpAt != nil && !belief.FollowUpAt.After(now) && belief.FollowedUpAt == nil {
+			result = append(result, cloneBelief(belief))
+		}
+	}
+	sort.SliceStable(result, func(i, j int) bool { return result[i].FollowUpAt.Before(*result[j].FollowUpAt) })
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
+}
+
 func cloneBelief(belief *domain.Belief) *domain.Belief {
 	if belief == nil {
 		return nil
@@ -166,5 +228,8 @@ func cloneBelief(belief *domain.Belief) *domain.Belief {
 	cp.SearchTerms = cloneStrings(belief.SearchTerms)
 	cp.Embedding = cloneFloat32s(belief.Embedding)
 	cp.LastContradictedAt = cloneTime(belief.LastContradictedAt)
+	cp.ValidUntil = cloneTime(belief.ValidUntil)
+	cp.FollowUpAt = cloneTime(belief.FollowUpAt)
+	cp.FollowedUpAt = cloneTime(belief.FollowedUpAt)
 	return &cp
 }

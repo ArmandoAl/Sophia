@@ -152,6 +152,9 @@ gasto**: es ahí donde conviene el modelo barato, no en la síntesis.
 | `EMBEDDINGS_ENABLED` | activa la deduplicación semántica |
 | `EMBEDDINGS_MODEL` | modelo de Vertex AI |
 | `SYNTHESIS_RUN_HOUR_LOCAL` | hora local de cierre del día |
+| `ENTITY_PROMOTION_THRESHOLD` | menciones necesarias para promover una persona inferida (3) |
+| `EPISODE_MIN_SALIENCE` | saliencia mínima para guardar un episodio (0.4) |
+| `EPISODE_MAX_PER_DAY` | máximo diario de episodios por usuario (5) |
 | `INGESTION_MAX_TOKENS_PER_BATCH` | tope de gasto por lote |
 
 ---
@@ -168,6 +171,7 @@ gasto**: es ahí donde conviene el modelo barato, no en la síntesis.
 | Memoria | `/memory`, `/memory/search`, `/memory/{id}` |
 | **Aprendizaje** | `/learning/beliefs`, `/learning/prompt-version`, `/learning/summaries` |
 | **Contextos** | `/contexts`, `/contexts/{id}` |
+| **Entidades** | `/entities`, `/entities/pending`, `/entities/{id}`, `/entities/{id}/merge` |
 | **Ingesta** | `/ingestion/conversations`, `/ingestion/batches/{id}` |
 | Propuestas | `/ai/action-proposals` (+ confirm, reject, execute) |
 | Runtime | `/ai/runtime/message` |

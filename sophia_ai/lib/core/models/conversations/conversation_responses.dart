@@ -80,6 +80,8 @@ class SendConversationMessageResponse {
     required this.assistantMessage,
     required this.proposedActions,
     this.runtimeRequestId,
+    this.activeEntity,
+    this.contextChanged = false,
   });
 
   final Conversation conversation;
@@ -87,6 +89,8 @@ class SendConversationMessageResponse {
   final ConversationMessage assistantMessage;
   final List<RuntimeProposedAction> proposedActions;
   final String? runtimeRequestId;
+  final EntityReference? activeEntity;
+  final bool contextChanged;
 
   factory SendConversationMessageResponse.fromJson(Map<String, dynamic> json) {
     return SendConversationMessageResponse(
@@ -106,6 +110,31 @@ class SendConversationMessageResponse {
           )
           .toList(),
       runtimeRequestId: json['runtime_request_id'] as String?,
+      activeEntity: json['active_entity'] is Map<String, dynamic>
+          ? EntityReference.fromJson(
+              json['active_entity'] as Map<String, dynamic>,
+            )
+          : null,
+      contextChanged: json['context_changed'] as bool? ?? false,
     );
   }
+}
+
+class EntityReference {
+  const EntityReference({
+    required this.id,
+    required this.scopeKey,
+    required this.label,
+    this.relationship = '',
+  });
+
+  final String id, scopeKey, label, relationship;
+
+  factory EntityReference.fromJson(Map<String, dynamic> json) =>
+      EntityReference(
+        id: json['id'] as String,
+        scopeKey: json['scope_key'] as String,
+        label: json['label'] as String,
+        relationship: json['relationship'] as String? ?? '',
+      );
 }

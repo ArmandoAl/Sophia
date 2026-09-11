@@ -11,10 +11,20 @@ class Belief {
     required this.contradictionCount,
     required this.trustTier,
     required this.promptSlot,
+    this.status = 'active',
+    this.subjectType = 'user',
+    this.subjectId = '',
+    this.factKind = '',
+    this.validUntil,
+    this.followUpAt,
+    this.sensitive = false,
   });
   final String id, statement, category, scope, scopeKey, promptSlot;
+  final String status, subjectType, subjectId, factKind;
   final double confidence, decayedConfidence;
   final int evidenceCount, contradictionCount, trustTier;
+  final DateTime? validUntil, followUpAt;
+  final bool sensitive;
   factory Belief.fromJson(Map<String, dynamic> json) => Belief(
     id: json['id'] as String,
     statement: json['statement'] as String,
@@ -27,6 +37,17 @@ class Belief {
     contradictionCount: json['contradiction_count'] as int,
     trustTier: json['trust_tier'] as int,
     promptSlot: json['prompt_slot'] as String? ?? '',
+    status: json['status'] as String? ?? 'active',
+    subjectType: json['subject_type'] as String? ?? 'user',
+    subjectId: json['subject_id'] as String? ?? '',
+    factKind: json['fact_kind'] as String? ?? '',
+    validUntil: DateTime.tryParse(
+      json['valid_until'] as String? ?? '',
+    )?.toLocal(),
+    followUpAt: DateTime.tryParse(
+      json['follow_up_at'] as String? ?? '',
+    )?.toLocal(),
+    sensitive: json['sensitive'] as bool? ?? false,
   );
 }
 

@@ -23,6 +23,14 @@ const (
 	StatusActive     = "active"
 	StatusSuperseded = "superseded"
 	StatusRetired    = "retired"
+	StatusArchived   = "archived"
+
+	SubjectUser   = "user"
+	SubjectEntity = "entity"
+
+	FactKindTrait        = "trait"
+	FactKindState        = "state"
+	FactKindRelationship = "relationship"
 
 	PromptSlotCore        = "core"
 	PromptSlotSituational = "situational"
@@ -35,15 +43,16 @@ const (
 	TrustStated   = 2
 	TrustInferred = 3
 
-	InitialConfidence           = 0.4
-	ReinforceRate               = 0.2
-	ContradictionWeight         = 2.5
-	HalfLifeDays                = 90.0
-	HighOverlapJaccard          = 0.5
-	defaultSearchTermMax        = 40
-	defaultSearchLimit          = 10
-	defaultListLimit            = 50
-	ContextFragmentTokenCeiling = 300
+	InitialConfidence               = 0.4
+	ReinforceRate                   = 0.2
+	ContradictionWeight             = 2.5
+	HalfLifeDays                    = 90.0
+	HighOverlapJaccard              = 0.5
+	defaultSearchTermMax            = 40
+	defaultSearchLimit              = 10
+	defaultListLimit                = 50
+	DefaultEntityContextTokenBudget = 400
+	ContextFragmentTokenCeiling     = DefaultEntityContextTokenBudget
 )
 
 var (
@@ -58,6 +67,10 @@ var (
 	ErrInvalidScope          = errors.New("invalid belief scope")
 	ErrInvalidScopeKey       = errors.New("invalid belief scope key")
 	ErrInvalidTrustTier      = errors.New("invalid belief trust tier")
+	ErrInvalidSubjectType    = errors.New("invalid belief subject type")
+	ErrInvalidSubjectID      = errors.New("invalid belief subject id")
+	ErrInvalidFactKind       = errors.New("invalid belief fact kind")
+	ErrStateValidUntil       = errors.New("state facts require valid_until")
 	ErrPromptVersionNotFound = errors.New("prompt version not found")
 	ErrInvalidPromptContent  = errors.New("prompt content is required")
 )
@@ -84,16 +97,29 @@ type Belief struct {
 	ScopeKey           string
 	TrustTier          int
 	BatchID            string
+	SubjectType        string
+	SubjectID          string
+	FactKind           string
+	ValidUntil         *time.Time
+	FollowUpAt         *time.Time
+	FollowedUpAt       *time.Time
+	Sensitive          bool
 }
 
 type BeliefCreate struct {
-	Statement  string
-	Category   string
-	PromptSlot string
-	Scope      string
-	ScopeKey   string
-	TrustTier  int
-	BatchID    string
+	Statement   string
+	Category    string
+	PromptSlot  string
+	Scope       string
+	ScopeKey    string
+	TrustTier   int
+	BatchID     string
+	SubjectType string
+	SubjectID   string
+	FactKind    string
+	ValidUntil  *time.Time
+	FollowUpAt  *time.Time
+	Sensitive   bool
 }
 
 type BeliefRepository interface {
@@ -106,10 +132,18 @@ type BeliefRepository interface {
 	SearchByTerms(ctx context.Context, userID string, terms []string, limit int) ([]*Belief, error)
 	SetPromptSlot(ctx context.Context, userID, beliefID, slot string) (*Belief, error)
 	RetireByBatchID(ctx context.Context, userID, batchID string) (int, error)
+	ListActiveBySubject(ctx context.Context, userID, subjectType, subjectID string, limit int) ([]*Belief, error)
+	ReassignEntityFacts(ctx context.Context, userID, sourceEntityID, targetEntityID string) error
+	ArchiveExpiredStates(ctx context.Context, now time.Time) (int, error)
+	ListDueFollowUps(ctx context.Context, userID string, now time.Time, limit int) ([]*Belief, error)
 }
 
 func NewBelief(id, userID string, input BeliefCreate) (*Belief, error) {
 	now := time.Now().UTC()
+	subjectType := strings.ToLower(strings.TrimSpace(input.SubjectType))
+	if subjectType == "" {
+		subjectType = SubjectUser
+	}
 	belief := &Belief{
 		ID:               strings.TrimSpace(id),
 		UserID:           strings.TrimSpace(userID),
@@ -125,6 +159,16 @@ func NewBelief(id, userID string, input BeliefCreate) (*Belief, error) {
 		ScopeKey:         strings.ToLower(strings.TrimSpace(input.ScopeKey)),
 		TrustTier:        input.TrustTier,
 		BatchID:          strings.TrimSpace(input.BatchID),
+		SubjectType:      subjectType,
+		SubjectID:        strings.TrimSpace(input.SubjectID),
+		FactKind:         strings.ToLower(strings.TrimSpace(input.FactKind)),
+		ValidUntil:       cloneTimeValue(input.ValidUntil),
+		FollowUpAt:       cloneTimeValue(input.FollowUpAt),
+		Sensitive:        input.Sensitive || sensitiveByDefault(input.Statement),
+	}
+	if belief.FactKind == FactKindState && belief.ValidUntil != nil && belief.FollowUpAt == nil {
+		midpoint := now.Add(belief.ValidUntil.Sub(now) / 2)
+		belief.FollowUpAt = &midpoint
 	}
 	belief.refreshDerived()
 	if err := belief.Validate(); err != nil {
@@ -174,6 +218,10 @@ func (b *Belief) PromptValue(now time.Time) float64 {
 }
 
 func (b *Belief) DecayedConfidence(now time.Time) float64 {
+	// Traits and relationships are stable. Only temporary states expire; otherwise Sofía could treat a sister as newly single a year later.
+	if b.FactKind == FactKindTrait || b.FactKind == FactKindRelationship {
+		return b.Confidence
+	}
 	if b.LastReinforcedAt.IsZero() {
 		return b.Confidence
 	}
@@ -212,7 +260,29 @@ func (b *Belief) Validate() error {
 	if b.Confidence > trustCeiling(b.EffectiveTrustTier()) {
 		return ErrInvalidConfidence
 	}
+	if !IsValidSubjectType(b.EffectiveSubjectType()) {
+		return ErrInvalidSubjectType
+	}
+	if (b.EffectiveSubjectType() == SubjectEntity && strings.TrimSpace(b.SubjectID) == "") || (b.EffectiveSubjectType() == SubjectUser && strings.TrimSpace(b.SubjectID) != "") {
+		return ErrInvalidSubjectID
+	}
+	if (b.FactKind != "" && !IsValidFactKind(b.FactKind)) || (b.EffectiveSubjectType() == SubjectEntity && b.FactKind == "") {
+		return ErrInvalidFactKind
+	}
+	if b.FactKind == FactKindState && b.ValidUntil == nil {
+		return ErrStateValidUntil
+	}
+	if b.FactKind != FactKindState && b.ValidUntil != nil {
+		return ErrInvalidFactKind
+	}
 	return nil
+}
+
+func (b *Belief) EffectiveSubjectType() string {
+	if value := strings.ToLower(strings.TrimSpace(b.SubjectType)); value != "" {
+		return value
+	}
+	return SubjectUser
 }
 
 func (b *Belief) EffectiveScope() string {
@@ -236,6 +306,7 @@ func (b *Belief) UpdateStatement(statement string) error {
 		return ErrInvalidStatement
 	}
 	b.Statement = statement
+	b.Sensitive = b.Sensitive || sensitiveByDefault(statement)
 	b.refreshDerived()
 	return nil
 }
@@ -243,6 +314,16 @@ func (b *Belief) UpdateStatement(statement string) error {
 func (b *Belief) refreshDerived() {
 	b.SearchTerms = memorydomain.ExtractTerms(b.Statement, defaultSearchTermMax)
 	b.TokenCost = ApproximateTokens(b.Statement)
+}
+
+func sensitiveByDefault(statement string) bool {
+	statement = strings.ToLower(statement)
+	for _, term := range []string{"salud", "enferm", "médic", "medic", "hospital", "dinero", "deuda", "finanz", "conflicto", "pelea", "discusión", "discusion"} {
+		if strings.Contains(statement, term) {
+			return true
+		}
+	}
+	return false
 }
 
 func ApproximateTokens(text string) int {
@@ -264,7 +345,20 @@ func IsValidCategory(value string) bool {
 
 func IsValidStatus(value string) bool {
 	switch value {
-	case StatusActive, StatusSuperseded, StatusRetired:
+	case StatusActive, StatusSuperseded, StatusRetired, StatusArchived:
+		return true
+	default:
+		return false
+	}
+}
+
+func IsValidSubjectType(value string) bool {
+	return value == SubjectUser || value == SubjectEntity
+}
+
+func IsValidFactKind(value string) bool {
+	switch value {
+	case FactKindTrait, FactKindState, FactKindRelationship:
 		return true
 	default:
 		return false
@@ -385,6 +479,14 @@ func clamp01(value float64) float64 {
 		return 1
 	}
 	return value
+}
+
+func cloneTimeValue(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	cp := *value
+	return &cp
 }
 
 func countTermOverlap(a, b []string) int {

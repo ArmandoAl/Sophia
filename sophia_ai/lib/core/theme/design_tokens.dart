@@ -126,6 +126,12 @@ abstract final class SophiaSize {
   static const double thinkingWidth = 48;
   static const double thinkingHeight = 24;
   static const double thinkingIndicator = 8;
+  static const double chartHeight = 128;
+  static const double minimumTapTarget = 48;
+}
+
+abstract final class SophiaDataViz {
+  static const double minimumBarFraction = .08;
 }
 
 abstract final class SophiaOpacity {

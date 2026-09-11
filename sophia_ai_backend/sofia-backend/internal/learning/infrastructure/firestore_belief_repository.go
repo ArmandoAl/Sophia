@@ -44,6 +44,13 @@ type firestoreBelief struct {
 	ScopeKey           string     `firestore:"scope_key"`
 	TrustTier          int        `firestore:"trust_tier"`
 	BatchID            string     `firestore:"batch_id"`
+	SubjectType        string     `firestore:"subject_type"`
+	SubjectID          string     `firestore:"subject_id"`
+	FactKind           string     `firestore:"fact_kind"`
+	ValidUntil         *time.Time `firestore:"valid_until,omitempty"`
+	FollowUpAt         *time.Time `firestore:"follow_up_at,omitempty"`
+	FollowedUpAt       *time.Time `firestore:"followed_up_at,omitempty"`
+	Sensitive          bool       `firestore:"sensitive"`
 }
 
 func NewFirestoreBeliefRepository(client *firestore.Client) *FirestoreBeliefRepository {
@@ -138,6 +145,21 @@ func (r *FirestoreBeliefRepository) ListActiveByScope(ctx context.Context, userI
 	return r.collect(ctx, query)
 }
 
+func (r *FirestoreBeliefRepository) ListActiveBySubject(ctx context.Context, userID, subjectType, subjectID string, limit int) ([]*domain.Belief, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	query := r.client.Collection(userBeliefsCollection).
+		Where("user_id", "==", userID).
+		Where("subject_type", "==", subjectType).
+		Where("subject_id", "==", subjectID).
+		Where("status", "==", domain.StatusActive).
+		OrderBy("confidence", firestore.Desc)
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	return r.collect(ctx, query)
+}
+
 func (r *FirestoreBeliefRepository) SearchByTerms(ctx context.Context, userID string, terms []string, limit int) ([]*domain.Belief, error) {
 	terms = memorydomain.CapSearchTerms(terms)
 	if len(terms) == 0 {
@@ -205,6 +227,81 @@ func (r *FirestoreBeliefRepository) RetireByBatchID(ctx context.Context, userID,
 	}
 }
 
+func (r *FirestoreBeliefRepository) ReassignEntityFacts(ctx context.Context, userID, sourceEntityID, targetEntityID string) error {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	iter := r.client.Collection(userBeliefsCollection).
+		Where("user_id", "==", userID).
+		Where("subject_type", "==", domain.SubjectEntity).
+		Where("subject_id", "==", sourceEntityID).
+		Documents(ctx)
+	defer iter.Stop()
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := doc.Ref.Update(ctx, []firestore.Update{{Path: "subject_id", Value: targetEntityID}}); err != nil {
+			return err
+		}
+	}
+}
+
+func (r *FirestoreBeliefRepository) ArchiveExpiredStates(ctx context.Context, now time.Time) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	iter := r.client.Collection(userBeliefsCollection).Where("valid_until", "<", now).Documents(ctx)
+	defer iter.Stop()
+	count := 0
+	for {
+		doc, err := iter.Next()
+		if errors.Is(err, iterator.Done) {
+			return count, nil
+		}
+		if err != nil {
+			return count, err
+		}
+		var stored firestoreBelief
+		if err := doc.DataTo(&stored); err != nil {
+			return count, err
+		}
+		if stored.Status != domain.StatusActive || stored.FactKind != domain.FactKindState {
+			continue
+		}
+		if _, err := doc.Ref.Update(ctx, []firestore.Update{{Path: "status", Value: domain.StatusArchived}}); err != nil {
+			return count, err
+		}
+		count++
+	}
+}
+
+func (r *FirestoreBeliefRepository) ListDueFollowUps(ctx context.Context, userID string, now time.Time, limit int) ([]*domain.Belief, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	query := r.client.Collection(userBeliefsCollection).
+		Where("user_id", "==", userID).
+		Where("status", "==", domain.StatusActive).
+		Where("follow_up_at", "<=", now).
+		OrderBy("follow_up_at", firestore.Asc)
+	beliefs, err := r.collect(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	result := beliefs[:0]
+	for _, belief := range beliefs {
+		if belief.FollowedUpAt == nil {
+			result = append(result, belief)
+		}
+	}
+	if limit > 0 && len(result) > limit {
+		result = result[:limit]
+	}
+	return result, nil
+}
+
 func (r *FirestoreBeliefRepository) collect(ctx context.Context, query firestore.Query) ([]*domain.Belief, error) {
 	iter := query.Documents(ctx)
 	defer iter.Stop()
@@ -249,6 +346,13 @@ func beliefToDocument(belief *domain.Belief) firestoreBelief {
 		ScopeKey:           belief.ScopeKey,
 		TrustTier:          belief.TrustTier,
 		BatchID:            belief.BatchID,
+		SubjectType:        belief.SubjectType,
+		SubjectID:          belief.SubjectID,
+		FactKind:           belief.FactKind,
+		ValidUntil:         cloneTime(belief.ValidUntil),
+		FollowUpAt:         cloneTime(belief.FollowUpAt),
+		FollowedUpAt:       cloneTime(belief.FollowedUpAt),
+		Sensitive:          belief.Sensitive,
 	}
 }
 
@@ -283,6 +387,13 @@ func (m firestoreBelief) toDomain() *domain.Belief {
 		ScopeKey:           m.ScopeKey,
 		TrustTier:          m.TrustTier,
 		BatchID:            m.BatchID,
+		SubjectType:        m.SubjectType,
+		SubjectID:          m.SubjectID,
+		FactKind:           m.FactKind,
+		ValidUntil:         cloneTime(m.ValidUntil),
+		FollowUpAt:         cloneTime(m.FollowUpAt),
+		FollowedUpAt:       cloneTime(m.FollowedUpAt),
+		Sensitive:          m.Sensitive,
 	}
 }
 

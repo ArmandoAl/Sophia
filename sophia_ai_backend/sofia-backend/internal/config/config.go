@@ -12,30 +12,35 @@ import (
 const (
 	DefaultContextTokenBudget = 4600
 
-	defaultEnv                = "development"
-	defaultPort               = "8080"
-	defaultJWTSecret          = "development-insecure-jwt-secret"
-	defaultRequestBodyLimit   = int64(1 << 20) // 1 MiB
-	defaultPersistence        = "memory"
-	defaultReadTimeout        = 10 * time.Second
-	defaultWriteTimeout       = 10 * time.Second
-	defaultIdleTimeout        = 60 * time.Second
-	defaultReadHeaderTimeout  = 5 * time.Second
-	defaultAIModelProvider    = "fake"
-	defaultDeepSeekModel      = "deepseek-v4-pro"
-	defaultJWTAccessTokenTTL  = 24 * time.Hour
-	defaultAuthRateLimit      = 10
-	defaultAuthRateWindow     = time.Minute
-	defaultReminderInterval   = 30 * time.Second
-	defaultReminderBatchSize  = 50
-	defaultReminderProvider   = "noop"
-	defaultReminderLease      = 2 * time.Minute
-	defaultSynthesisInterval  = time.Minute
-	defaultSynthesisLease     = 2 * time.Minute
-	defaultSynthesisRunHour   = 3
-	defaultAutonomyThreshold  = 0.85
-	defaultBeliefDedupe       = 0.85
-	defaultIngestionMaxTokens = 50000
+	defaultEnv                   = "development"
+	defaultPort                  = "8080"
+	defaultJWTSecret             = "development-insecure-jwt-secret"
+	defaultRequestBodyLimit      = int64(1 << 20) // 1 MiB
+	defaultPersistence           = "memory"
+	defaultReadTimeout           = 10 * time.Second
+	defaultWriteTimeout          = 10 * time.Second
+	defaultIdleTimeout           = 60 * time.Second
+	defaultReadHeaderTimeout     = 5 * time.Second
+	defaultAIModelProvider       = "fake"
+	defaultDeepSeekModel         = "deepseek-v4-pro"
+	defaultJWTAccessTokenTTL     = 24 * time.Hour
+	defaultAuthRateLimit         = 10
+	defaultAuthRateWindow        = time.Minute
+	defaultReminderInterval      = 30 * time.Second
+	defaultReminderBatchSize     = 50
+	defaultReminderProvider      = "noop"
+	defaultReminderLease         = 2 * time.Minute
+	defaultSynthesisInterval     = time.Minute
+	defaultSynthesisLease        = 2 * time.Minute
+	defaultSynthesisRunHour      = 3
+	defaultAutonomyThreshold     = 0.85
+	defaultBeliefDedupe          = 0.85
+	defaultIngestionMaxTokens    = 50000
+	defaultEntityPromotion       = 3
+	defaultEpisodeMaxPerDay      = 5
+	defaultEpisodeMinSalience    = 0.4
+	defaultEpisodeWorkerInterval = time.Hour
+	defaultEpisodeRunHour        = 4
 )
 
 type Config struct {
@@ -83,6 +88,12 @@ type Config struct {
 	SynthesisRunHourLocal      int
 	AutonomyThreshold          float64
 	IngestionMaxTokensPerBatch int
+	EntityPromotionThreshold   int
+	EpisodeMaxPerDay           int
+	EpisodeMinSalience         float64
+	EpisodeWorkerEnabled       bool
+	EpisodeWorkerInterval      time.Duration
+	EpisodeRunHourUTC          int
 }
 
 func Load() (Config, error) {
@@ -142,6 +153,12 @@ func Load() (Config, error) {
 		SynthesisRunHourLocal:      defaultSynthesisRunHour,
 		AutonomyThreshold:          defaultAutonomyThreshold,
 		IngestionMaxTokensPerBatch: defaultIngestionMaxTokens,
+		EntityPromotionThreshold:   defaultEntityPromotion,
+		EpisodeMaxPerDay:           defaultEpisodeMaxPerDay,
+		EpisodeMinSalience:         defaultEpisodeMinSalience,
+		EpisodeWorkerEnabled:       boolEnv("EPISODE_WORKER_ENABLED", false),
+		EpisodeWorkerInterval:      defaultEpisodeWorkerInterval,
+		EpisodeRunHourUTC:          defaultEpisodeRunHour,
 	}
 
 	if !isValidEnv(cfg.Env) {
@@ -254,6 +271,21 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if cfg.IngestionMaxTokensPerBatch, err = intEnv("INGESTION_MAX_TOKENS_PER_BATCH", cfg.IngestionMaxTokensPerBatch); err != nil {
+		return Config{}, err
+	}
+	if cfg.EntityPromotionThreshold, err = intEnv("ENTITY_PROMOTION_THRESHOLD", cfg.EntityPromotionThreshold); err != nil {
+		return Config{}, err
+	}
+	if cfg.EpisodeMaxPerDay, err = intEnv("EPISODE_MAX_PER_DAY", cfg.EpisodeMaxPerDay); err != nil {
+		return Config{}, err
+	}
+	if cfg.EpisodeMinSalience, err = ratioEnv("EPISODE_MIN_SALIENCE", cfg.EpisodeMinSalience); err != nil {
+		return Config{}, err
+	}
+	if cfg.EpisodeWorkerInterval, err = durationEnv("EPISODE_WORKER_INTERVAL", cfg.EpisodeWorkerInterval); err != nil {
+		return Config{}, err
+	}
+	if cfg.EpisodeRunHourUTC, err = hourEnv("EPISODE_RUN_HOUR_UTC", cfg.EpisodeRunHourUTC); err != nil {
 		return Config{}, err
 	}
 

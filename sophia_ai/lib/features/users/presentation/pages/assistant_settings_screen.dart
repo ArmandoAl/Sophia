@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sophia_ai/core/di/service_locator.dart';
@@ -8,6 +9,8 @@ import 'package:sophia_ai/core/models/users/update_ai_settings_request.dart';
 import 'package:sophia_ai/core/widgets/neon_button.dart';
 import 'package:sophia_ai/core/widgets/neon_wrapper.dart';
 import 'package:sophia_ai/core/widgets/sophia_card.dart';
+import 'package:sophia_ai/core/theme/design_tokens.dart';
+import 'package:sophia_ai/core/widgets/motion/motion_widgets.dart';
 import 'package:sophia_ai/features/session/presentation/cubit/session_cubit.dart';
 import 'package:sophia_ai/features/session/presentation/cubit/session_state.dart';
 import 'package:sophia_ai/features/users/presentation/cubit/ai_settings_cubit.dart';
@@ -82,12 +85,16 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
 
     return NeonWrapper(
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: context.colors.surface.withValues(alpha: 0),
         appBar: AppBar(
           title: const Text('Assistant settings'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/settings'),
+          leading: TactileButton(
+            semanticLabel: 'Volver a ajustes',
+            onPressed: context.pop,
+            child: const Padding(
+              padding: EdgeInsets.all(SophiaSpace.sm),
+              child: Icon(Icons.arrow_back),
+            ),
           ),
         ),
         body: BlocConsumer<AiSettingsCubit, AiSettingsState>(
@@ -152,7 +159,10 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
                             .toList(),
                         onChanged: saving
                             ? null
-                            : (v) => setState(() => _proactivity = v!),
+                            : (v) {
+                                HapticFeedback.selectionClick();
+                                setState(() => _proactivity = v!);
+                              },
                       ),
                       DropdownButtonFormField<AutonomyLevel>(
                         isExpanded: true,
@@ -178,25 +188,28 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
                             .toList(),
                         onChanged: saving
                             ? null
-                            : (v) => setState(() => _autonomy = v!),
+                            : (v) {
+                                HapticFeedback.selectionClick();
+                                setState(() => _autonomy = v!);
+                              },
                       ),
-                      SwitchListTile(
-                        key: const Key('ai_memory_switch'),
-                        title: const Text('Memory enabled'),
+                      _SettingToggle(
+                        controlKey: const Key('ai_memory_switch'),
+                        label: 'Memory enabled',
                         value: _memory,
                         onChanged: saving
                             ? null
                             : (v) => setState(() => _memory = v),
                       ),
-                      SwitchListTile(
-                        title: const Text('Reminders enabled'),
+                      _SettingToggle(
+                        label: 'Reminders enabled',
                         value: _reminders,
                         onChanged: saving
                             ? null
                             : (v) => setState(() => _reminders = v),
                       ),
-                      SwitchListTile(
-                        title: const Text('Planning enabled'),
+                      _SettingToggle(
+                        label: 'Planning enabled',
                         value: _planning,
                         onChanged: saving
                             ? null
@@ -240,4 +253,34 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
       ),
     );
   }
+}
+
+class _SettingToggle extends StatelessWidget {
+  const _SettingToggle({
+    this.controlKey,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final Key? controlKey;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: SophiaSpace.xs),
+    child: Row(
+      children: [
+        Expanded(child: Text(label)),
+        SophiaSwitch(
+          key: controlKey,
+          value: value,
+          onChanged: onChanged,
+          semanticLabel: label,
+        ),
+      ],
+    ),
+  );
 }

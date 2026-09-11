@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:sophia_ai/core/theme/design_tokens.dart';
 import 'package:sophia_ai/core/widgets/neon_wrapper.dart';
 
 /// Shared dark neon scaffold for auth / onboarding forms.
@@ -20,13 +21,15 @@ class AuthScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     return NeonWrapper(
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: context.colors.surface.withValues(alpha: 0),
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
+              constraints: const BoxConstraints(
+                maxWidth: SophiaSize.contentMaxWidth,
+              ),
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(SophiaSpace.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -40,25 +43,25 @@ class AuthScaffold extends StatelessWidget {
                             color: Theme.of(context).primaryColor,
                           ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: SophiaSpace.lg),
                     Text(
                       title,
                       style: Theme.of(context).textTheme.headlineMedium
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     if (subtitle != null) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: SophiaSpace.xs),
                       Text(
                         subtitle!,
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: context.colors.softInk,
+                        ),
                       ),
                     ],
-                    const SizedBox(height: 24),
+                    const SizedBox(height: SophiaSpace.lg),
                     child,
                     if (footer != null) ...[
-                      const SizedBox(height: 24),
+                      const SizedBox(height: SophiaSpace.lg),
                       footer!,
                     ],
                   ],

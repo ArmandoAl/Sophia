@@ -1,77 +1,55 @@
 import 'package:flutter/material.dart';
 import 'package:sophia_ai/features/smart_home/domain/entities/smart_device.dart';
 
+import '../theme/design_tokens.dart';
+import 'sophia_card.dart';
+
 class DeviceCard extends StatelessWidget {
+  const DeviceCard({super.key, required this.device, required this.onTap});
+
   final SmartDevice device;
   final VoidCallback onTap;
 
-  const DeviceCard({super.key, required this.device, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
-    final isActive = device.isOn;
-
-    return GestureDetector(
+    final active = device.isOn;
+    return SophiaCard(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isActive
-              ? const Color(0xFF1E2636) // Ligeramente más claro si está activo
-              : const Color(0xFF151B24), // Fondo oscuro base
-          borderRadius: BorderRadius.circular(24),
-          border: isActive
-              ? Border.all(
-                  color: Colors.blueAccent.withValues(alpha: 0.3),
-                  width: 1,
-                )
-              : null,
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : [],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+      borderColor: active ? context.colors.accent : context.colors.line,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(SophiaSpace.xs),
+            decoration: BoxDecoration(
+              color: context.colors.accent.withValues(
+                alpha: SophiaOpacity.subtle,
               ),
-              child: Icon(device.icon, color: Colors.white, size: 20),
+              shape: BoxShape.circle,
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  device.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  device.isOn ? (device.statusText ?? "On") : "Off",
-                  style: TextStyle(
-                    color: isActive ? Colors.blueAccent : Colors.grey,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+            child: Icon(
+              device.icon,
+              color: active ? context.colors.accent : context.colors.softInk,
+              size: SophiaSpace.lg,
             ),
-          ],
-        ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(device.name, style: Theme.of(context).textTheme.labelLarge),
+              const SizedBox(height: SophiaSpace.xxs),
+              Text(
+                active ? (device.statusText ?? 'On') : 'Off',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: active
+                      ? context.colors.accent
+                      : context.colors.softInk,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

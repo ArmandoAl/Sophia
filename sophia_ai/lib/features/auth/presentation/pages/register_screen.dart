@@ -5,6 +5,8 @@ import 'package:sophia_ai/core/di/service_locator.dart';
 import 'package:sophia_ai/core/network/api_exception.dart';
 import 'package:sophia_ai/core/widgets/auth_scaffold.dart';
 import 'package:sophia_ai/core/widgets/neon_button.dart';
+import 'package:sophia_ai/core/theme/design_tokens.dart';
+import 'package:sophia_ai/core/widgets/motion/motion_widgets.dart';
 import 'package:sophia_ai/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:sophia_ai/features/auth/presentation/cubit/auth_state.dart';
 
@@ -77,11 +79,14 @@ class _RegisterViewState extends State<_RegisterView> {
         return AuthScaffold(
           title: 'Create account',
           subtitle: 'You will sign in after registering',
-          footer: TextButton(
+          footer: TactileButton(
             onPressed: loading
                 ? null
                 : () => GoRouter.maybeOf(context)?.go('/login'),
-            child: const Text('Already have an account?'),
+            child: const Padding(
+              padding: EdgeInsets.all(SophiaSpace.sm),
+              child: Text('Already have an account?'),
+            ),
           ),
           child: Form(
             key: _formKey,

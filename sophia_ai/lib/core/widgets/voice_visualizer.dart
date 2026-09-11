@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
+import '../theme/design_tokens.dart';
+import '../theme/motion.dart';
+
 /// Widget que muestra una visualización animada de ondas de sonido
 /// cuando el usuario está hablando con el asistente de voz
 class VoiceVisualizer extends StatefulWidget {
@@ -17,10 +20,19 @@ class _VoiceVisualizerState extends State<VoiceVisualizer>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    )..repeat();
+    _controller = AnimationController(vsync: this, duration: SophiaMotion.long);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (SophiaMotion.reduced(context)) {
+      _controller
+        ..stop()
+        ..value = .5;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
   }
 
   @override
@@ -32,7 +44,7 @@ class _VoiceVisualizerState extends State<VoiceVisualizer>
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 60,
+      height: SophiaSpace.xxxl,
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, child) {
@@ -49,19 +61,19 @@ class _VoiceVisualizerState extends State<VoiceVisualizer>
                 height: height,
                 margin: const EdgeInsets.symmetric(horizontal: 3),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     colors: [
-                      Color(0xFF00B4D8), // Cyan
-                      Color(0xFF4CC9F0), // Cyan claro
+                      context.colors.accent,
+                      context.colors.accent.withValues(alpha: .55),
                     ],
                     begin: Alignment.bottomCenter,
                     end: Alignment.topCenter,
                   ),
-                  borderRadius: BorderRadius.circular(4),
+                  borderRadius: BorderRadius.circular(SophiaRadius.control),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF00B4D8).withValues(alpha: 0.5),
-                      blurRadius: 8,
+                      color: context.colors.accent.withValues(alpha: .2),
+                      blurRadius: SophiaSpace.xs,
                       spreadRadius: 1,
                     ),
                   ],

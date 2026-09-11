@@ -41,7 +41,7 @@ class _Warning extends StatelessWidget {
       children: [
         Icon(
           Icons.privacy_tip_outlined,
-          size: 40,
+          size: SophiaSpace.xl,
           color: context.colors.attention,
         ),
         const SizedBox(height: SophiaSpace.lg),
@@ -55,7 +55,7 @@ class _Warning extends StatelessWidget {
         ),
         const SizedBox(height: SophiaSpace.sm),
         const Text(
-          'Lo aprendido entra como creencia de nivel 3, con confianza máxima de 0.5, hasta que una decisión tuya lo corrobore.',
+          'Lo aprendido se guarda como una deducción provisional (nivel 3), con confianza limitada al 50%, hasta que una decisión tuya lo confirme.',
         ),
         const Spacer(),
         SizedBox(
@@ -118,42 +118,71 @@ class _BatchListState extends State<_BatchList> {
         child: RefreshIndicator(
           key: const ValueKey('imports-content'),
           onRefresh: context.read<IngestionCubit>().load,
-          child: ListView(
-            padding: const EdgeInsets.all(SophiaSpace.lg),
-            children: [
-              const Text(
-                'El selector de archivos llegará con el conversor. Por ahora puedes revisar y deshacer lotes enviados por API.',
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: SophiaSize.contentMaxWidth,
               ),
-              const SizedBox(height: SophiaSpace.lg),
-              if (state.error != null)
-                Text(
-                  state.error!,
-                  style: TextStyle(color: context.colors.critical),
-                ),
-              if (state.batches.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(top: 32),
-                  child: Text('No hay lotes importados.'),
-                ),
-              for (final batch in state.batches)
-                Card(
-                  child: ListTile(
-                    title: Text(
-                      'Lote ${batch.id.substring(0, batch.id.length.clamp(0, 8))}',
+              child: ListView(
+                padding: const EdgeInsets.all(SophiaSpace.lg),
+                children: [
+                  const Text(
+                    'El selector de archivos llegará con el conversor. Por ahora puedes revisar y deshacer lotes enviados por API.',
+                  ),
+                  const SizedBox(height: SophiaSpace.lg),
+                  if (state.error != null)
+                    Text(
+                      state.error!,
+                      style: TextStyle(color: context.colors.critical),
                     ),
-                    subtitle: Text(
-                      '${batch.status} · ${batch.beliefsCreated} creencias',
+                  if (state.batches.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: SophiaSpace.xl),
+                      child: Text('No hay lotes importados.'),
                     ),
-                    trailing: TactileButton(
-                      onPressed: () => _undo(context, batch.id),
-                      child: const Padding(
-                        padding: EdgeInsets.all(SophiaSpace.xs),
-                        child: Text('Deshacer'),
+                  for (final batch in state.batches)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(SophiaSpace.md),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Lote ${batch.id.substring(0, batch.id.length.clamp(0, 8))}',
+                                  ),
+                                  const SizedBox(height: SophiaSpace.xxs),
+                                  Text(
+                                    _batchStatus(batch.status),
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                  Text(
+                                    '${batch.beliefsCreated} creencias generadas',
+                                    style: SophiaType.dataLabel(context),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TactileButton(
+                              semanticLabel: 'Deshacer lote',
+                              onPressed: () => _undo(context, batch.id),
+                              child: const Padding(
+                                padding: EdgeInsets.all(SophiaSpace.sm),
+                                child: Text('Deshacer'),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                ),
-            ],
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -177,16 +206,26 @@ class _BatchListState extends State<_BatchList> {
             const Text(
               'Se retirarán todas las creencias generadas por este lote.',
             ),
+            const SizedBox(height: SophiaSpace.lg),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                TextButton(
+                TactileButton(
                   onPressed: () => Navigator.pop(dialogContext, false),
-                  child: const Text('Cancelar'),
+                  child: const Padding(
+                    padding: EdgeInsets.all(SophiaSpace.sm),
+                    child: Text('Cancelar'),
+                  ),
                 ),
-                FilledButton(
+                TactileButton(
                   onPressed: () => Navigator.pop(dialogContext, true),
-                  child: const Text('Deshacer'),
+                  child: Padding(
+                    padding: const EdgeInsets.all(SophiaSpace.sm),
+                    child: Text(
+                      'Deshacer',
+                      style: TextStyle(color: context.colors.accent),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -199,3 +238,12 @@ class _BatchListState extends State<_BatchList> {
     }
   }
 }
+
+String _batchStatus(String value) => switch (value) {
+  'pending' => 'Pendiente de procesar',
+  'processing' => 'Procesando',
+  'completed' => 'Procesado',
+  'failed' => 'No se pudo procesar',
+  'undone' => 'Deshecho',
+  _ => 'Estado no disponible',
+};

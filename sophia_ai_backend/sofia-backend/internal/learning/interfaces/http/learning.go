@@ -13,20 +13,26 @@ import (
 )
 
 type beliefResponse struct {
-	ID                 string    `json:"id"`
-	Statement          string    `json:"statement"`
-	Category           string    `json:"category"`
-	Scope              string    `json:"scope"`
-	ScopeKey           string    `json:"scope_key"`
-	Confidence         float64   `json:"confidence"`
-	DecayedConfidence  float64   `json:"decayed_confidence"`
-	EvidenceCount      int       `json:"evidence_count"`
-	ContradictionCount int       `json:"contradiction_count"`
-	TrustTier          int       `json:"trust_tier"`
-	PromptSlot         string    `json:"prompt_slot"`
-	Status             string    `json:"status"`
-	FirstObservedAt    time.Time `json:"first_observed_at"`
-	LastReinforcedAt   time.Time `json:"last_reinforced_at"`
+	ID                 string     `json:"id"`
+	Statement          string     `json:"statement"`
+	Category           string     `json:"category"`
+	Scope              string     `json:"scope"`
+	ScopeKey           string     `json:"scope_key"`
+	Confidence         float64    `json:"confidence"`
+	DecayedConfidence  float64    `json:"decayed_confidence"`
+	EvidenceCount      int        `json:"evidence_count"`
+	ContradictionCount int        `json:"contradiction_count"`
+	TrustTier          int        `json:"trust_tier"`
+	PromptSlot         string     `json:"prompt_slot"`
+	Status             string     `json:"status"`
+	FirstObservedAt    time.Time  `json:"first_observed_at"`
+	LastReinforcedAt   time.Time  `json:"last_reinforced_at"`
+	SubjectType        string     `json:"subject_type"`
+	SubjectID          string     `json:"subject_id"`
+	FactKind           string     `json:"fact_kind"`
+	ValidUntil         *time.Time `json:"valid_until,omitempty"`
+	FollowUpAt         *time.Time `json:"follow_up_at,omitempty"`
+	Sensitive          bool       `json:"sensitive"`
 }
 
 type summaryResponse struct {
@@ -215,7 +221,7 @@ func parseLimit(r *http.Request, fallback int) (int, error) {
 }
 
 func beliefToResponse(belief *domain.Belief, now time.Time) beliefResponse {
-	return beliefResponse{ID: belief.ID, Statement: belief.Statement, Category: belief.Category, Scope: belief.EffectiveScope(), ScopeKey: belief.ScopeKey, Confidence: belief.Confidence, DecayedConfidence: belief.DecayedConfidence(now), EvidenceCount: belief.EvidenceCount, ContradictionCount: belief.ContradictionCount, TrustTier: belief.EffectiveTrustTier(), PromptSlot: belief.PromptSlot, Status: belief.Status, FirstObservedAt: belief.FirstObservedAt, LastReinforcedAt: belief.LastReinforcedAt}
+	return beliefResponse{ID: belief.ID, Statement: belief.Statement, Category: belief.Category, Scope: belief.EffectiveScope(), ScopeKey: belief.ScopeKey, Confidence: belief.Confidence, DecayedConfidence: belief.DecayedConfidence(now), EvidenceCount: belief.EvidenceCount, ContradictionCount: belief.ContradictionCount, TrustTier: belief.EffectiveTrustTier(), PromptSlot: belief.PromptSlot, Status: belief.Status, FirstObservedAt: belief.FirstObservedAt, LastReinforcedAt: belief.LastReinforcedAt, SubjectType: belief.EffectiveSubjectType(), SubjectID: belief.SubjectID, FactKind: belief.FactKind, ValidUntil: belief.ValidUntil, FollowUpAt: belief.FollowUpAt, Sensitive: belief.Sensitive}
 }
 
 func summaryToResponse(summary *domain.DailySummary) summaryResponse {

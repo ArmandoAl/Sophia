@@ -6,6 +6,8 @@ import 'package:sophia_ai/core/models/users/update_profile_request.dart';
 import 'package:sophia_ai/core/widgets/neon_button.dart';
 import 'package:sophia_ai/core/widgets/neon_wrapper.dart';
 import 'package:sophia_ai/core/widgets/sophia_card.dart';
+import 'package:sophia_ai/core/theme/design_tokens.dart';
+import 'package:sophia_ai/core/widgets/motion/motion_widgets.dart';
 import 'package:sophia_ai/features/session/presentation/cubit/session_cubit.dart';
 import 'package:sophia_ai/features/session/presentation/cubit/session_state.dart';
 import 'package:sophia_ai/features/users/presentation/cubit/user_profile_cubit.dart';
@@ -77,12 +79,16 @@ class _ProfileViewState extends State<_ProfileView> {
 
     return NeonWrapper(
       child: Scaffold(
-        backgroundColor: Colors.transparent,
+        backgroundColor: context.colors.surface.withValues(alpha: 0),
         appBar: AppBar(
           title: const Text('Profile'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.go('/settings'),
+          leading: TactileButton(
+            semanticLabel: 'Volver a ajustes',
+            onPressed: context.pop,
+            child: const Padding(
+              padding: EdgeInsets.all(SophiaSpace.sm),
+              child: Icon(Icons.arrow_back),
+            ),
           ),
         ),
         body: BlocConsumer<UserProfileCubit, UserProfileState>(

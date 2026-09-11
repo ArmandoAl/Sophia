@@ -27,13 +27,16 @@ var (
 )
 
 type Conversation struct {
-	ID            string     `json:"id"`
-	UserID        string     `json:"user_id"`
-	Title         string     `json:"title"`
-	Status        string     `json:"status"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	LastMessageAt *time.Time `json:"last_message_at,omitempty"`
+	ID                 string     `json:"id"`
+	UserID             string     `json:"user_id"`
+	Title              string     `json:"title"`
+	Status             string     `json:"status"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	LastMessageAt      *time.Time `json:"last_message_at,omitempty"`
+	CarryForward       string     `json:"carry_forward,omitempty"`
+	CarryForwardEntity string     `json:"carry_forward_entity,omitempty"`
+	OpenThreadRetaken  bool       `json:"-"`
 }
 
 type ConversationMessage struct {

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/armandoalvarado/sofia-backend/internal/learning/domain"
 	learninginfra "github.com/armandoalvarado/sofia-backend/internal/learning/infrastructure"
@@ -229,6 +230,164 @@ func TestUpsertBeliefDoesNotDeduplicateAcrossScopes(t *testing.T) {
 	}
 }
 
+func TestGetEntityContextExcludesExpiredState(t *testing.T) {
+	svc := newLearningService()
+	ctx := context.Background()
+	entity, err := svc.CreateUserContext(ctx, "user-1", domain.UserContextCreate{Kind: domain.ScopePerson, Slug: "diana", Label: "Diana"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	expired := time.Now().UTC().Add(-time.Hour)
+	state, err := svc.UpsertEntityBelief(ctx, "user-1", entity.ID, "Acaban de cortarla", domain.CategoryPersonal, domain.FactKindState, &expired, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.GetEntityContext(ctx, "user-1", entity.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Beliefs) != 0 {
+		t.Fatalf("expired state loaded into entity context: %+v", got.Beliefs)
+	}
+	archived, err := svc.GetBelief(ctx, "user-1", state.ID)
+	if err != nil || archived.Status != domain.StatusArchived {
+		t.Fatalf("expired state was not archived: %+v err=%v", archived, err)
+	}
+}
+
+func TestEntityContextNeverExceedsDefaultBudget(t *testing.T) {
+	svc := newLearningService()
+	ctx := context.Background()
+	entity, err := svc.CreateUserContext(ctx, "user-1", domain.UserContextCreate{Kind: domain.ScopePerson, Slug: "diana", Label: "Diana"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 30; i++ {
+		statement := strings.Repeat("detalle"+strconv.Itoa(i)+" ", 30)
+		if _, err := svc.UpsertEntityBelief(ctx, "user-1", entity.ID, statement, domain.CategoryPersonal, domain.FactKindTrait, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := svc.GetEntityContext(ctx, "user-1", entity.ID, domain.DefaultEntityContextTokenBudget)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.TokenCount > domain.DefaultEntityContextTokenBudget {
+		t.Fatalf("entity context tokens = %d, ceiling = %d", got.TokenCount, domain.DefaultEntityContextTokenBudget)
+	}
+}
+
+func TestEntityContextUsesRequiredPriorityOrder(t *testing.T) {
+	svc := newLearningService()
+	ctx := context.Background()
+	entity, err := svc.CreateUserContext(ctx, "user-1", domain.UserContextCreate{Kind: domain.ScopePerson, Slug: "diana", Label: "Diana"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	validUntil := time.Now().UTC().Add(24 * time.Hour)
+	for _, fact := range []struct{ statement, kind string }{
+		{"Rasgo", domain.FactKindTrait},
+		{"Relación", domain.FactKindRelationship},
+		{"Estado", domain.FactKindState},
+	} {
+		var until *time.Time
+		if fact.kind == domain.FactKindState {
+			until = &validUntil
+		}
+		if _, err := svc.UpsertEntityBelief(ctx, "user-1", entity.ID, fact.statement, domain.CategoryPersonal, fact.kind, until, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := svc.UpsertBelief(ctx, "user-1", "Cómo actúa el usuario", domain.CategoryPersonal, domain.ScopePerson, "person:diana"); err != nil {
+		t.Fatal(err)
+	}
+	got, err := svc.GetEntityContext(ctx, "user-1", entity.ID, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"Estado", "Relación", "Rasgo", "Cómo actúa el usuario"}
+	for i, statement := range want {
+		if len(got.Beliefs) <= i || got.Beliefs[i].Statement != statement {
+			t.Fatalf("belief order = %+v, want %v", got.Beliefs, want)
+		}
+	}
+}
+
+func TestEntityFactsAreIsolatedByEntity(t *testing.T) {
+	svc := newLearningService()
+	ctx := context.Background()
+	diana, err := svc.CreateUserContext(ctx, "user-1", domain.UserContextCreate{Kind: domain.ScopePerson, Slug: "diana", Label: "Diana"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	samira, err := svc.CreateUserContext(ctx, "user-1", domain.UserContextCreate{Kind: domain.ScopePerson, Slug: "samira", Label: "Samira"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := svc.UpsertEntityBelief(ctx, "user-1", diana.ID, "Le gusta Mon Laferte", domain.CategoryPersonal, domain.FactKindTrait, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := svc.UpsertEntityBelief(ctx, "user-1", samira.ID, "Le gusta Mon Laferte", domain.CategoryPersonal, domain.FactKindTrait, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.ID == second.ID {
+		t.Fatal("different entities shared one fact")
+	}
+	dianaContext, err := svc.GetEntityContext(ctx, "user-1", diana.ID, 0)
+	if err != nil || len(dianaContext.Beliefs) != 1 || dianaContext.Beliefs[0].SubjectID != diana.ID {
+		t.Fatalf("unexpected Diana context: %+v err=%v", dianaContext, err)
+	}
+	samiraContext, err := svc.GetEntityContext(ctx, "user-1", samira.ID, 0)
+	if err != nil || len(samiraContext.Beliefs) != 1 || samiraContext.Beliefs[0].SubjectID != samira.ID {
+		t.Fatalf("unexpected Samira context: %+v err=%v", samiraContext, err)
+	}
+}
+
+func TestMergeUserContextsReassignsFacts(t *testing.T) {
+	svc := newLearningService()
+	ctx := context.Background()
+	source, err := svc.CreateUserContext(ctx, "user-1", domain.UserContextCreate{Kind: domain.ScopePerson, Slug: "didi", Label: "Didi"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := svc.CreateUserContext(ctx, "user-1", domain.UserContextCreate{Kind: domain.ScopePerson, Slug: "diana", Label: "Diana"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	validUntil := time.Now().UTC().Add(24 * time.Hour)
+	for _, fact := range []struct {
+		statement string
+		kind      string
+		until     *time.Time
+	}{
+		{statement: "Odia el cilantro", kind: domain.FactKindTrait},
+		{statement: "Es su hermana", kind: domain.FactKindRelationship},
+		{statement: "Busca trabajo", kind: domain.FactKindState, until: &validUntil},
+	} {
+		if _, err := svc.UpsertEntityBelief(ctx, "user-1", source.ID, fact.statement, domain.CategoryPersonal, fact.kind, fact.until, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	merged, err := svc.MergeUserContexts(ctx, "user-1", source.ID, target.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if merged.Status != domain.ContextStatusMerged || merged.MergedInto != target.ID {
+		t.Fatalf("source was not marked merged: %+v", merged)
+	}
+	got, err := svc.GetEntityContext(ctx, "user-1", target.ID, 0)
+	if err != nil || len(got.Beliefs) != 3 {
+		t.Fatalf("facts were not reassigned: %+v err=%v", got, err)
+	}
+	for _, belief := range got.Beliefs {
+		if belief.SubjectID != target.ID {
+			t.Fatalf("fact %s still belongs to source %s", belief.ID, belief.SubjectID)
+		}
+	}
+}
+
 func TestUserContextCRUD(t *testing.T) {
 	svc := newLearningService()
 	ctx := context.Background()
@@ -357,6 +516,30 @@ func TestDailySummaryIsAppendOnly(t *testing.T) {
 	}
 	if len(summary.Observations) != 1 || summary.Observations[0] != "first" {
 		t.Fatalf("append-only history was overwritten: %+v", summary.Observations)
+	}
+}
+
+func TestGetEntityDetailsIncludesEntityAndUserScopedFacts(t *testing.T) {
+	svc := newLearningService()
+	ctx := context.Background()
+	entity, err := svc.CreateUserContext(ctx, "user-1", domain.UserContextCreate{
+		Kind: domain.ScopePerson, Slug: "diana", Label: "Diana",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.UpsertEntityBelief(ctx, "user-1", entity.ID, "Le gusta el jazz", domain.CategoryPersonal, domain.FactKindTrait, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := svc.UpsertBelief(ctx, "user-1", "Con Diana soy paciente", domain.CategoryPersonal, domain.ScopePerson, "person:diana"); err != nil {
+		t.Fatal(err)
+	}
+	details, err := svc.GetEntityDetails(ctx, "user-1", entity.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(details.Beliefs) != 1 || len(details.UserBeliefs) != 1 {
+		t.Fatalf("entity facts=%d user facts=%d, want 1 each", len(details.Beliefs), len(details.UserBeliefs))
 	}
 }
 

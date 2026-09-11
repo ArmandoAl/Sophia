@@ -1,5 +1,10 @@
 # Sofía — Runbook de despliegue
 
+> **Para desplegar a Cloud Run, TestFlight y el repo público usa `runbook_release.md`.**
+> La sección 8 de este documento tiene dos errores: el secreto JWT se llama
+> `sofia-jwt-secret`, y `gcloud builds submit --tag` no construye el worker (hay que usar
+> `cloudbuild.yaml`). Los pasos 1-7 y 9-11 de aquí siguen siendo válidos.
+
 Proyecto GCP: **`sophia-ai-60e87`** · Cuenta: `alvaradoarmandodev@gmail.com`
 
 Sigue el orden. Cada bloque dice **qué hace**, **qué comando** y **cómo saber que salió bien**.

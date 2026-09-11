@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sophia_ai/core/di/service_locator.dart';
 import 'package:sophia_ai/core/models/enums/autonomy_level.dart';
@@ -7,6 +8,8 @@ import 'package:sophia_ai/core/models/users/update_ai_settings_request.dart';
 import 'package:sophia_ai/core/models/users/update_profile_request.dart';
 import 'package:sophia_ai/core/widgets/auth_scaffold.dart';
 import 'package:sophia_ai/core/widgets/neon_button.dart';
+import 'package:sophia_ai/core/theme/design_tokens.dart';
+import 'package:sophia_ai/core/widgets/motion/motion_widgets.dart';
 import 'package:sophia_ai/features/session/presentation/cubit/session_cubit.dart';
 import 'package:sophia_ai/features/session/presentation/cubit/session_state.dart';
 import 'package:sophia_ai/features/users/presentation/cubit/onboarding_cubit.dart';
@@ -184,7 +187,10 @@ class _OnboardingViewState extends State<_OnboardingView> {
                       .toList(),
                   onChanged: busy
                       ? null
-                      : (v) => setState(() => _proactivity = v!),
+                      : (v) {
+                          HapticFeedback.selectionClick();
+                          setState(() => _proactivity = v!);
+                        },
                 ),
                 DropdownButtonFormField<AutonomyLevel>(
                   key: ValueKey('autonomy_${_autonomy.value}'),
@@ -208,27 +214,30 @@ class _OnboardingViewState extends State<_OnboardingView> {
                       .toList(),
                   onChanged: busy
                       ? null
-                      : (v) => setState(() => _autonomy = v!),
+                      : (v) {
+                          HapticFeedback.selectionClick();
+                          setState(() => _autonomy = v!);
+                        },
                 ),
-                const SizedBox(height: 8),
-                const Text(
+                const SizedBox(height: SophiaSpace.xs),
+                Text(
                   'Proposal-only: Sofia suggests; you confirm actions.',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                  style: Theme.of(context).textTheme.labelSmall,
                 ),
-                SwitchListTile(
-                  title: const Text('Memory enabled'),
+                _SettingToggle(
+                  label: 'Memory enabled',
                   value: _memory,
                   onChanged: busy ? null : (v) => setState(() => _memory = v),
                 ),
-                SwitchListTile(
-                  title: const Text('Reminders enabled'),
+                _SettingToggle(
+                  label: 'Reminders enabled',
                   value: _reminders,
                   onChanged: busy
                       ? null
                       : (v) => setState(() => _reminders = v),
                 ),
-                SwitchListTile(
-                  title: const Text('Planning enabled'),
+                _SettingToggle(
+                  label: 'Planning enabled',
                   value: _planning,
                   onChanged: busy ? null : (v) => setState(() => _planning = v),
                 ),
@@ -266,4 +275,27 @@ class _OnboardingViewState extends State<_OnboardingView> {
       },
     );
   }
+}
+
+class _SettingToggle extends StatelessWidget {
+  const _SettingToggle({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: SophiaSpace.xs),
+    child: Row(
+      children: [
+        Expanded(child: Text(label)),
+        SophiaSwitch(value: value, onChanged: onChanged, semanticLabel: label),
+      ],
+    ),
+  );
 }

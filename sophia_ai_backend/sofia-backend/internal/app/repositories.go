@@ -49,6 +49,8 @@ type Repositories struct {
 	PromptVersions   learningdomain.PromptVersionRepository
 	DailySummaries   learningdomain.DailySummaryRepository
 	UserContexts     learningdomain.UserContextRepository
+	EntityCandidates learningdomain.EntityCandidateRepository
+	Episodes         learningdomain.EpisodeRepository
 	IngestionBatches ingestiondomain.BatchRepository
 	DeviceTokens     notificationsdomain.DeviceTokenRepository
 	Tools            toolsdomain.ToolDefinitionRepository
@@ -77,6 +79,8 @@ func BuildRepositories(cfg config.Config) (*Repositories, error) {
 			PromptVersions:   learninginfra.NewInMemoryPromptVersionRepository(),
 			DailySummaries:   learninginfra.NewInMemoryDailySummaryRepository(),
 			UserContexts:     learninginfra.NewInMemoryUserContextRepository(),
+			EntityCandidates: learninginfra.NewInMemoryEntityCandidateRepository(),
+			Episodes:         learninginfra.NewInMemoryEpisodeRepository(),
 			IngestionBatches: ingestioninfra.NewInMemoryBatchRepository(),
 			DeviceTokens:     notificationsinfra.NewInMemoryDeviceTokenRepository(),
 			Tools:            toolsinfra.NewInMemoryToolDefinitionRepository(),
@@ -110,6 +114,8 @@ func BuildRepositories(cfg config.Config) (*Repositories, error) {
 		PromptVersions:   learninginfra.NewFirestorePromptVersionRepository(store.Client),
 		DailySummaries:   learninginfra.NewFirestoreDailySummaryRepository(store.Client),
 		UserContexts:     learninginfra.NewFirestoreUserContextRepository(store.Client),
+		EntityCandidates: learninginfra.NewFirestoreEntityCandidateRepository(store.Client),
+		Episodes:         learninginfra.NewFirestoreEpisodeRepository(store.Client),
 		IngestionBatches: ingestioninfra.NewFirestoreBatchRepository(store.Client),
 		DeviceTokens:     notificationsinfra.NewFirestoreDeviceTokenRepository(store.Client),
 		Tools:            toolsinfra.NewFirestoreToolDefinitionRepository(store.Client),

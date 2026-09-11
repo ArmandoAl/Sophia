@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sophia_ai/core/theme/design_tokens.dart';
+import 'package:sophia_ai/core/widgets/motion/motion_widgets.dart';
 import 'package:sophia_ai/core/widgets/neon_wrapper.dart';
 import '../cubit/smart_home_cubit.dart';
 import 'package:sophia_ai/core/widgets/circular_ligh_control.dart';
@@ -15,15 +17,27 @@ class SmartHomePage extends StatelessWidget {
       child: BlocProvider(
         create: (_) => SmartHomeCubit(),
         child: Scaffold(
-          backgroundColor: Colors.transparent,
+          backgroundColor: context.colors.surface.withValues(alpha: 0),
           appBar: AppBar(
             title: const Text("Living Room"),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-              onPressed: () {}, // GoRouter pop
+            leading: TactileButton(
+              semanticLabel: 'Volver',
+              onPressed: () {},
+              child: const Padding(
+                padding: EdgeInsets.all(SophiaSpace.sm),
+                child: Icon(Icons.arrow_back_ios_new),
+              ),
             ),
             actions: [
-              IconButton(icon: const Icon(Icons.mic), onPressed: () {}),
+              TactileButton(
+                semanticLabel: 'Micrófono',
+                onPressed: () {},
+                child: const Padding(
+                  padding: EdgeInsets.all(SophiaSpace.sm),
+                  child: Icon(Icons.mic),
+                ),
+              ),
+              const SizedBox(width: SophiaSpace.xs),
             ],
           ),
           body: const _SmartHomeBody(),
@@ -42,7 +56,7 @@ class _SmartHomeBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(SophiaSpace.lg),
         child: BlocBuilder<SmartHomeCubit, SmartHomeState>(
           builder: (context, state) {
             return Column(
@@ -57,11 +71,11 @@ class _SmartHomeBody extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 40),
+                const SizedBox(height: SophiaSpace.xl),
 
                 // 2. Scenes Selector
                 Text("Scenes", style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: 16),
+                const SizedBox(height: SophiaSpace.md),
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -70,33 +84,40 @@ class _SmartHomeBody extends StatelessWidget {
                     ) {
                       final isActive = state.activeScene == scene;
                       return Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: ChoiceChip(
-                          label: Text(scene),
-                          selected: isActive,
-                          onSelected: (_) =>
+                        padding: const EdgeInsets.only(right: SophiaSpace.sm),
+                        child: TactileButton(
+                          onPressed: () =>
                               context.read<SmartHomeCubit>().changeScene(scene),
-                          selectedColor: const Color(0xFF4361EE),
-                          backgroundColor: const Color(0xFF151B24),
-                          labelStyle: TextStyle(
-                            color: isActive ? Colors.white : Colors.grey,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: SophiaSpace.md,
+                              vertical: SophiaSpace.sm,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isActive
+                                  ? context.colors.accent
+                                  : context.colors.elevated,
+                              border: Border.all(color: context.colors.line),
+                              borderRadius: BorderRadius.circular(
+                                SophiaRadius.sheet,
+                              ),
+                            ),
+                            child: Text(
+                              scene,
+                              style: TextStyle(
+                                color: isActive
+                                    ? context.colors.surface
+                                    : context.colors.softInk,
+                              ),
+                            ),
                           ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          showCheckmark: false,
-                          side: BorderSide.none,
                         ),
                       );
                     }).toList(),
                   ),
                 ),
 
-                const SizedBox(height: 30),
+                const SizedBox(height: SophiaSpace.xl),
 
                 // 3. Grid de Dispositivos
                 GridView.builder(
@@ -105,8 +126,8 @@ class _SmartHomeBody extends StatelessWidget {
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     childAspectRatio: 1.4,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
+                    crossAxisSpacing: SophiaSpace.md,
+                    mainAxisSpacing: SophiaSpace.md,
                   ),
                   itemCount: state.devices.length,
                   itemBuilder: (context, index) {
@@ -119,7 +140,7 @@ class _SmartHomeBody extends StatelessWidget {
                     );
                   },
                 ),
-                const SizedBox(height: 80), // Espacio para el Music Player
+                const SizedBox(height: SophiaSpace.xxxl),
               ],
             );
           },
@@ -136,15 +157,19 @@ class _MusicPlayerBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.all(SophiaSpace.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: SophiaSpace.md,
+        vertical: SophiaSpace.sm,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xFF1A1F36),
-        borderRadius: BorderRadius.circular(16),
+        color: context.colors.elevated,
+        borderRadius: BorderRadius.circular(SophiaRadius.card),
+        border: Border.all(color: context.colors.line),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 10,
+            color: context.colors.scrim.withValues(alpha: SophiaOpacity.subtle),
+            blurRadius: SophiaSpace.sm,
             offset: const Offset(0, 5),
           ),
         ],
@@ -155,7 +180,7 @@ class _MusicPlayerBar extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(SophiaRadius.control),
               image: const DecorationImage(
                 image: NetworkImage(
                   "https://picsum.photos/200",
@@ -164,29 +189,32 @@ class _MusicPlayerBar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
-          const Expanded(
+          const SizedBox(width: SophiaSpace.sm),
+          Expanded(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   "Starlight Wonder",
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: Theme.of(context).textTheme.labelLarge,
                 ),
                 Text(
                   "Casting to Nest Audio",
-                  style: TextStyle(color: Color(0xFF3F51B5), fontSize: 12),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: context.colors.accent,
+                  ),
                 ),
               ],
             ),
           ),
-          IconButton(
+          TactileButton(
+            semanticLabel: 'Pausar',
             onPressed: () {},
-            icon: const Icon(Icons.pause, color: Colors.white),
+            child: const Padding(
+              padding: EdgeInsets.all(SophiaSpace.sm),
+              child: Icon(Icons.pause),
+            ),
           ),
         ],
       ),

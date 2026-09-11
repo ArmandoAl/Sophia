@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/theme/design_tokens.dart';
+import '../../../../core/theme/motion.dart';
 import '../../../../core/widgets/motion/motion_widgets.dart';
 import '../../../beliefs/domain/models.dart';
 import '../cubit/health_cubit.dart';
@@ -28,6 +29,7 @@ class DiagnosticsScreen extends StatelessWidget {
 
 class _DiagnosticsView extends StatelessWidget {
   const _DiagnosticsView({required this.learningAvailable});
+
   final bool learningAvailable;
 
   @override
@@ -42,9 +44,9 @@ class _DiagnosticsView extends StatelessWidget {
               padding: EdgeInsets.all(SophiaSpace.lg),
               child: Column(
                 children: [
-                  ContentSkeleton(height: 140),
+                  ContentSkeleton(),
                   SizedBox(height: SophiaSpace.lg),
-                  ContentSkeleton(height: 180),
+                  ContentSkeleton(),
                 ],
               ),
             ),
@@ -64,6 +66,7 @@ class _DiagnosticsView extends StatelessWidget {
                   ),
                   const SizedBox(height: SophiaSpace.md),
                   TactileButton(
+                    semanticLabel: 'Reintentar diagnóstico',
                     onPressed: context.read<HealthCubit>().check,
                     child: const Padding(
                       padding: EdgeInsets.all(SophiaSpace.sm),
@@ -75,6 +78,7 @@ class _DiagnosticsView extends StatelessWidget {
             ),
           );
         }
+
         final health = state is HealthHealthy
             ? state.health
             : (state as HealthDegraded).health;
@@ -88,118 +92,134 @@ class _DiagnosticsView extends StatelessWidget {
                 await context.read<LearningDiagnosticsCubit>().load();
               }
             },
-            child: ListView(
-              padding: const EdgeInsets.all(SophiaSpace.lg),
-              children: [
-                StaggeredEntry(
-                  index: 0,
-                  child: _Panel(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: SophiaSize.contentMaxWidth,
+                ),
+                child: ListView(
+                  padding: const EdgeInsets.all(SophiaSpace.lg),
+                  children: [
+                    StaggeredEntry(
+                      index: 0,
+                      child: _Panel(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(
-                              Icons.circle,
-                              size: 10,
-                              color: healthy
-                                  ? context.colors.positive
-                                  : context.colors.attention,
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.circle,
+                                  size: SophiaSpace.sm,
+                                  color: healthy
+                                      ? context.colors.positive
+                                      : context.colors.attention,
+                                ),
+                                const SizedBox(width: SophiaSpace.xs),
+                                Expanded(
+                                  child: Text(
+                                    healthy
+                                        ? 'Todo funciona'
+                                        : 'Servicio degradado',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.titleMedium,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: SophiaSpace.xs),
-                            Text(
-                              healthy ? 'Todo funciona' : 'Servicio degradado',
-                              style: Theme.of(context).textTheme.titleMedium,
+                            const SizedBox(height: SophiaSpace.lg),
+                            _row(
+                              context,
+                              'Estado',
+                              health.status,
+                              key: const Key('diagnostics_status'),
+                            ),
+                            _row(
+                              context,
+                              'Entorno',
+                              health.environment,
+                              key: const Key('diagnostics_environment'),
+                            ),
+                            _row(
+                              context,
+                              'Firestore',
+                              health.firestore,
+                              key: const Key('diagnostics_firestore'),
                             ),
                           ],
                         ),
-                        const SizedBox(height: SophiaSpace.lg),
-                        _row(
-                          context,
-                          'Estado',
-                          health.status,
-                          key: const Key('diagnostics_status'),
-                        ),
-                        _row(
-                          context,
-                          'Entorno',
-                          health.environment,
-                          key: const Key('diagnostics_environment'),
-                        ),
-                        _row(
-                          context,
-                          'Firestore',
-                          health.firestore,
-                          key: const Key('diagnostics_firestore'),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: SophiaSpace.lg),
-                if (learningAvailable)
-                  StaggeredEntry(
-                    index: 1,
-                    child:
-                        BlocBuilder<
-                          LearningDiagnosticsCubit,
-                          LearningDiagnosticsState
-                        >(
-                          builder: (context, learning) {
-                            if (learning.loading) {
-                              return const MotionSwap(
-                                child: ContentSkeleton(
-                                  key: ValueKey('learning-loading'),
-                                  height: 230,
-                                ),
-                              );
-                            }
-                            if (learning.error != null) {
-                              return MotionSwap(
-                                child: _Panel(
-                                  key: const ValueKey('learning-error'),
-                                  child: Text(
-                                    'Aprendizaje: ${learning.error}',
-                                    style: TextStyle(
-                                      color: context.colors.critical,
+                    const SizedBox(height: SophiaSpace.lg),
+                    if (learningAvailable)
+                      StaggeredEntry(
+                        index: 1,
+                        child:
+                            BlocBuilder<
+                              LearningDiagnosticsCubit,
+                              LearningDiagnosticsState
+                            >(
+                              builder: (context, learning) {
+                                if (learning.loading) {
+                                  return const MotionSwap(
+                                    child: ContentSkeleton(
+                                      key: ValueKey('learning-loading'),
                                     ),
+                                  );
+                                }
+                                if (learning.error != null) {
+                                  return MotionSwap(
+                                    child: _Panel(
+                                      key: const ValueKey('learning-error'),
+                                      child: Text(
+                                        'Aprendizaje: ${learning.error}',
+                                        style: TextStyle(
+                                          color: context.colors.critical,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return MotionSwap(
+                                  child: _LearningPanel(
+                                    key: const ValueKey('learning-content'),
+                                    prompt: learning.prompt,
+                                    summaries: learning.summaries,
                                   ),
-                                ),
-                              );
-                            }
-                            return MotionSwap(
-                              child: _LearningPanel(
-                                key: const ValueKey('learning-content'),
-                                prompt: learning.prompt,
-                                summaries: learning.summaries,
-                              ),
-                            );
-                          },
+                                );
+                              },
+                            ),
+                      ),
+                    const SizedBox(height: SophiaSpace.lg),
+                    TactileButton(
+                      semanticLabel: 'Actualizar diagnóstico',
+                      onPressed: () {
+                        context.read<HealthCubit>().check();
+                        if (learningAvailable) {
+                          context.read<LearningDiagnosticsCubit>().load();
+                        }
+                      },
+                      child: Container(
+                        key: const Key('diagnostics_refresh'),
+                        padding: const EdgeInsets.all(SophiaSpace.md),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: context.colors.accent,
+                          borderRadius: BorderRadius.circular(
+                            SophiaRadius.control,
+                          ),
                         ),
-                  ),
-                const SizedBox(height: SophiaSpace.lg),
-                TactileButton(
-                  onPressed: () {
-                    context.read<HealthCubit>().check();
-                    if (learningAvailable) {
-                      context.read<LearningDiagnosticsCubit>().load();
-                    }
-                  },
-                  child: Container(
-                    key: const Key('diagnostics_refresh'),
-                    padding: const EdgeInsets.all(SophiaSpace.md),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: context.colors.accent,
-                      borderRadius: BorderRadius.circular(SophiaRadius.control),
+                        child: Text(
+                          'Actualizar',
+                          style: TextStyle(color: context.colors.surface),
+                        ),
+                      ),
                     ),
-                    child: Text(
-                      'Actualizar',
-                      style: TextStyle(color: context.colors.surface),
-                    ),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -211,11 +231,23 @@ class _DiagnosticsView extends StatelessWidget {
       Padding(
         padding: const EdgeInsets.only(bottom: SophiaSpace.sm),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: TextStyle(color: context.colors.softInk)),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(color: context.colors.softInk),
+              ),
+            ),
+            const SizedBox(width: SophiaSpace.md),
             Flexible(
-              child: Text(value, key: key, textAlign: TextAlign.end),
+              child: Text(
+                value,
+                key: key,
+                textAlign: TextAlign.end,
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+              ),
             ),
           ],
         ),
@@ -228,15 +260,16 @@ class _LearningPanel extends StatelessWidget {
     required this.prompt,
     required this.summaries,
   });
+
   final PromptVersion? prompt;
   final List<LearningSummary> summaries;
 
   @override
   Widget build(BuildContext context) {
-    final peak = summaries.fold<int>(1, (max, item) {
-      final total = item.approved + item.corrected + item.rejected;
-      return total > max ? total : max;
-    });
+    final totalTokens = summaries.fold<int>(
+      0,
+      (total, item) => total + item.inputTokens + item.outputTokens,
+    );
     return _Panel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -250,41 +283,107 @@ class _LearningPanel extends StatelessWidget {
             prompt == null
                 ? 'Sin prompt activo'
                 : 'Prompt v${prompt!.version} · ${prompt!.tokenCount} tokens',
-            style: TextStyle(color: context.colors.softInk),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: SophiaType.dataLabel(
+              context,
+            ).copyWith(color: context.colors.softInk),
           ),
           const SizedBox(height: SophiaSpace.lg),
-          SizedBox(
-            height: 112,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                for (final summary in summaries.reversed)
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: SophiaSpace.xxs,
-                      ),
-                      child: Tooltip(
-                        message:
-                            '${summary.date}: ${summary.approved} aprobadas, ${summary.corrected} corregidas, ${summary.rejected} rechazadas; ${summary.inputTokens + summary.outputTokens} tokens',
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Coste de los últimos 7 días',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              Text('$totalTokens tokens', style: SophiaType.dataLabel(context)),
+            ],
+          ),
+          const SizedBox(height: SophiaSpace.md),
+          LearningWeekChart(summaries: summaries),
+        ],
+      ),
+    );
+  }
+}
+
+class LearningWeekChart extends StatelessWidget {
+  const LearningWeekChart({super.key, required this.summaries});
+
+  final List<LearningSummary> summaries;
+
+  @override
+  Widget build(BuildContext context) {
+    final days = _week(summaries, DateTime.now());
+    final peak = days.fold<int>(1, (value, day) {
+      final cost = day.cost;
+      return cost > value ? cost : value;
+    });
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          height: SophiaSize.chartHeight,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (final day in days)
+                Expanded(
+                  child: Tooltip(
+                    message: day.summary == null
+                        ? '${day.key}: el worker no registró una ejecución'
+                        : '${day.key}: ${day.cost} tokens; ${day.decisions} ${day.decisions == 1 ? 'decisión revisada' : 'decisiones revisadas'}',
+                    child: Semantics(
+                      label: day.summary == null
+                          ? '${day.key}, sin ejecución'
+                          : '${day.key}, worker ejecutado, coste ${day.cost} tokens',
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: SophiaSpace.xxs,
+                        ),
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
+                            Icon(
+                              day.summary == null
+                                  ? Icons.remove_circle_outline
+                                  : Icons.check_circle_outline,
+                              size: SophiaSpace.md,
+                              color: day.summary == null
+                                  ? context.colors.muted
+                                  : context.colors.positive,
+                            ),
+                            const SizedBox(height: SophiaSpace.xs),
                             Expanded(
                               child: Align(
                                 alignment: Alignment.bottomCenter,
-                                child: FractionallySizedBox(
-                                  heightFactor:
-                                      ((summary.approved +
-                                                  summary.corrected +
-                                                  summary.rejected) /
-                                              peak)
-                                          .clamp(.08, 1),
+                                child: TweenAnimationBuilder<double>(
+                                  tween: Tween(
+                                    begin: SophiaDataViz.minimumBarFraction,
+                                    end: day.summary == null
+                                        ? SophiaDataViz.minimumBarFraction
+                                        : (day.cost / peak).clamp(
+                                            SophiaDataViz.minimumBarFraction,
+                                            1,
+                                          ),
+                                  ),
+                                  duration: SophiaMotion.resolve(
+                                    context,
+                                    SophiaMotion.medium,
+                                  ),
+                                  curve: SophiaMotion.contentCurve,
+                                  builder: (context, value, child) =>
+                                      FractionallySizedBox(
+                                        heightFactor: value,
+                                        widthFactor: 1,
+                                        child: child,
+                                      ),
                                   child: DecoratedBox(
                                     decoration: BoxDecoration(
-                                      color: context.colors.accent.withValues(
-                                        alpha: .65,
-                                      ),
+                                      color: day.summary == null
+                                          ? context.colors.line
+                                          : context.colors.accent,
                                       borderRadius: BorderRadius.circular(
                                         SophiaRadius.control,
                                       ),
@@ -295,30 +394,87 @@ class _LearningPanel extends StatelessWidget {
                             ),
                             const SizedBox(height: SophiaSpace.xs),
                             Text(
-                              summary.date.length >= 10
-                                  ? summary.date.substring(8)
-                                  : summary.date,
+                              day.day.day.toString().padLeft(2, '0'),
                               maxLines: 1,
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(color: context.colors.softInk),
+                              overflow: TextOverflow.clip,
+                              style: SophiaType.dataLabel(
+                                context,
+                              ).copyWith(color: context.colors.softInk),
                             ),
                           ],
                         ),
                       ),
                     ),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: SophiaSpace.md),
+        Wrap(
+          spacing: SophiaSpace.md,
+          runSpacing: SophiaSpace.xs,
+          children: [
+            _Legend(color: context.colors.positive, label: 'Worker ejecutado'),
+            _Legend(color: context.colors.muted, label: 'Sin ejecución'),
+          ],
+        ),
+      ],
     );
   }
 }
 
+class _Legend extends StatelessWidget {
+  const _Legend({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(Icons.circle, size: SophiaSpace.xs, color: color),
+      const SizedBox(width: SophiaSpace.xs),
+      Text(label, style: Theme.of(context).textTheme.labelMedium),
+    ],
+  );
+}
+
+class _LearningDay {
+  const _LearningDay(this.day, this.key, this.summary);
+
+  final DateTime day;
+  final String key;
+  final LearningSummary? summary;
+
+  int get cost => (summary?.inputTokens ?? 0) + (summary?.outputTokens ?? 0);
+  int get decisions =>
+      (summary?.approved ?? 0) +
+      (summary?.corrected ?? 0) +
+      (summary?.rejected ?? 0);
+}
+
+List<_LearningDay> _week(List<LearningSummary> summaries, DateTime now) {
+  final byDate = {
+    for (final item in summaries)
+      if (item.date.length >= 10) item.date.substring(0, 10): item,
+  };
+  final today = DateUtils.dateOnly(now);
+  return List.generate(7, (index) {
+    final day = today.subtract(Duration(days: 6 - index));
+    final month = day.month.toString().padLeft(2, '0');
+    final date = day.day.toString().padLeft(2, '0');
+    final key = '${day.year}-$month-$date';
+    return _LearningDay(day, key, byDate[key]);
+  });
+}
+
 class _Panel extends StatelessWidget {
   const _Panel({super.key, required this.child});
+
   final Widget child;
+
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(SophiaSpace.lg),

@@ -52,6 +52,13 @@ Map<String, dynamic> sendResponseJson() => {
   ),
   'proposed_actions': <Map<String, dynamic>>[],
   'runtime_request_id': 'req_1',
+  'active_entity': {
+    'id': 'entity_1',
+    'scope_key': 'person:diana',
+    'label': 'Diana',
+    'relationship': 'hermana',
+  },
+  'context_changed': true,
 };
 
 void main() {
@@ -79,6 +86,15 @@ void main() {
       expect(response.userMessage.content, 'Hola');
       expect(response.assistantMessage.content, 'Hola, soy Sophia.');
       expect(response.runtimeRequestId, 'req_1');
+      expect(response.activeEntity?.label, 'Diana');
+      expect(response.contextChanged, isTrue);
+      expect(
+        const SendConversationMessageRequest(
+          content: '¿Cómo está?',
+          activeContext: 'person:diana',
+        ).toJson()['active_context'],
+        'person:diana',
+      );
     });
   });
 
