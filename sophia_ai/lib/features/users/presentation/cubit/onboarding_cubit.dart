@@ -59,4 +59,10 @@ class OnboardingCubit extends Cubit<OnboardingState> {
   }
 
   void reset() => emit(const OnboardingInitial());
+
+  @override
+  void emit(OnboardingState state) {
+    if (isClosed) return;
+    super.emit(state);
+  }
 }

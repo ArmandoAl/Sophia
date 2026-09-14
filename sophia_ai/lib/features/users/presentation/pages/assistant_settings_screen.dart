@@ -130,18 +130,21 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
                           labelText: 'Assistant name',
                         ),
                       ),
+                      const SizedBox(height: SophiaSpace.md),
                       TextField(
                         controller: _communicationStyle,
                         decoration: const InputDecoration(
                           labelText: 'Communication style',
                         ),
                       ),
+                      const SizedBox(height: SophiaSpace.md),
                       TextField(
                         controller: _preferredLanguage,
                         decoration: const InputDecoration(
                           labelText: 'Preferred language',
                         ),
                       ),
+                      const SizedBox(height: SophiaSpace.md),
                       DropdownButtonFormField<ProactivityLevel>(
                         isExpanded: true,
                         key: ValueKey('proactivity_${_proactivity.value}'),
@@ -164,6 +167,7 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
                                 setState(() => _proactivity = v!);
                               },
                       ),
+                      const SizedBox(height: SophiaSpace.md),
                       DropdownButtonFormField<AutonomyLevel>(
                         isExpanded: true,
                         key: ValueKey('autonomy_${_autonomy.value}'),
@@ -193,6 +197,7 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
                                 setState(() => _autonomy = v!);
                               },
                       ),
+                      const SizedBox(height: SophiaSpace.sm),
                       _SettingToggle(
                         controlKey: const Key('ai_memory_switch'),
                         label: 'Memory enabled',
@@ -201,6 +206,7 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
                             ? null
                             : (v) => setState(() => _memory = v),
                       ),
+                      const SizedBox(height: SophiaSpace.xs),
                       _SettingToggle(
                         label: 'Reminders enabled',
                         value: _reminders,
@@ -208,6 +214,7 @@ class _AssistantSettingsViewState extends State<_AssistantSettingsView> {
                             ? null
                             : (v) => setState(() => _reminders = v),
                       ),
+                      const SizedBox(height: SophiaSpace.xs),
                       _SettingToggle(
                         label: 'Planning enabled',
                         value: _planning,

@@ -146,4 +146,10 @@ class ChatMessageCubit extends Cubit<ChatMessageState> {
     if (error is ApiException) return error.message;
     return 'Unable to load Sophia chat';
   }
+
+  @override
+  void emit(ChatMessageState state) {
+    if (isClosed) return;
+    super.emit(state);
+  }
 }

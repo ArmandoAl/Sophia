@@ -124,22 +124,26 @@ class _ProfileViewState extends State<_ProfileView> {
                           labelText: 'Display name',
                         ),
                       ),
+                      const SizedBox(height: SophiaSpace.md),
                       TextField(
                         controller: _preferredName,
                         decoration: const InputDecoration(
                           labelText: 'Preferred name',
                         ),
                       ),
+                      const SizedBox(height: SophiaSpace.md),
                       TextField(
                         controller: _timezone,
                         decoration: const InputDecoration(
                           labelText: 'Timezone',
                         ),
                       ),
+                      const SizedBox(height: SophiaSpace.md),
                       TextField(
                         controller: _locale,
                         decoration: const InputDecoration(labelText: 'Locale'),
                       ),
+                      const SizedBox(height: SophiaSpace.md),
                       TextField(
                         controller: _avatarUrl,
                         decoration: const InputDecoration(

@@ -79,4 +79,10 @@ class UserProfileCubit extends Cubit<UserProfileState> {
     if (session is SessionAuthenticated) return session.profile;
     return null;
   }
+
+  @override
+  void emit(UserProfileState state) {
+    if (isClosed) return;
+    super.emit(state);
+  }
 }

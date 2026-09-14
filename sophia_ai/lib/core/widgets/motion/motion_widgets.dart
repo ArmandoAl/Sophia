@@ -208,9 +208,9 @@ class _TactileButtonState extends State<TactileButton>
         behavior: HitTestBehavior.opaque,
         onTapDown: widget.onPressed == null ? null : (_) => _setPressed(true),
         onTapCancel: widget.onPressed == null ? null : () => _setPressed(false),
-        onTapUp: widget.onPressed == null
+        onTap: widget.onPressed == null
             ? null
-            : (_) {
+            : () {
                 _setPressed(false);
                 _activate();
               },
@@ -231,7 +231,7 @@ class _TactileButtonState extends State<TactileButton>
                     minWidth: SophiaSize.minimumTapTarget,
                     minHeight: SophiaSize.minimumTapTarget,
                   ),
-                  child: widget.child,
+                  child: Center(child: widget.child),
                 )
               : const ScaleEffect(
                   begin: Offset(1, 1),
@@ -243,7 +243,7 @@ class _TactileButtonState extends State<TactileButton>
                       minWidth: SophiaSize.minimumTapTarget,
                       minHeight: SophiaSize.minimumTapTarget,
                     ),
-                    child: widget.child,
+                    child: Center(child: widget.child),
                   ),
                   controller,
                   EffectEntry(
@@ -286,26 +286,34 @@ class SophiaSwitch extends StatelessWidget {
       child: AnimatedContainer(
         duration: SophiaMotion.resolve(context, SophiaMotion.short),
         curve: SophiaMotion.contentCurve,
-        width: SophiaSpace.xxl,
-        height: SophiaSpace.lg,
-        padding: const EdgeInsets.all(SophiaSpace.xxs),
+        width: 48,
+        height: 26,
+        padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 2.5),
         decoration: BoxDecoration(
           color: value ? context.colors.accent : context.colors.elevated,
           border: Border.all(
             color: value ? context.colors.accent : context.colors.line,
+            width: 1.5,
           ),
-          borderRadius: BorderRadius.circular(SophiaRadius.sheet),
+          borderRadius: BorderRadius.circular(13),
         ),
         child: AnimatedAlign(
           duration: SophiaMotion.resolve(context, SophiaMotion.short),
           curve: SophiaMotion.contentCurve,
           alignment: value ? Alignment.centerRight : Alignment.centerLeft,
           child: Container(
-            width: SophiaSpace.md,
-            height: SophiaSpace.md,
+            width: 20,
+            height: 20,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: value ? context.colors.surface : context.colors.muted,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
+                ),
+              ],
             ),
           ),
         ),

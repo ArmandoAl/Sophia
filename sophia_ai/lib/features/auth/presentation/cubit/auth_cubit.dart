@@ -77,4 +77,10 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   void reset() => emit(const AuthInitial());
+
+  @override
+  void emit(AuthState state) {
+    if (isClosed) return;
+    super.emit(state);
+  }
 }

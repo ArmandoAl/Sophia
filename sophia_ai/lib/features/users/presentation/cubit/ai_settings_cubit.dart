@@ -75,4 +75,10 @@ class AiSettingsCubit extends Cubit<AiSettingsState> {
     if (session is SessionAuthenticated) return session.aiSettings;
     return null;
   }
+
+  @override
+  void emit(AiSettingsState state) {
+    if (isClosed) return;
+    super.emit(state);
+  }
 }

@@ -135,20 +135,24 @@ class _OnboardingViewState extends State<_OnboardingView> {
                   controller: _displayName,
                   decoration: const InputDecoration(labelText: 'Display name'),
                 ),
+                const SizedBox(height: SophiaSpace.md),
                 TextField(
                   controller: _preferredName,
                   decoration: const InputDecoration(
                     labelText: 'Preferred name',
                   ),
                 ),
+                const SizedBox(height: SophiaSpace.md),
                 TextField(
                   controller: _timezone,
                   decoration: const InputDecoration(labelText: 'Timezone'),
                 ),
+                const SizedBox(height: SophiaSpace.md),
                 TextField(
                   controller: _locale,
                   decoration: const InputDecoration(labelText: 'Locale'),
                 ),
+                const SizedBox(height: SophiaSpace.md),
                 TextField(
                   controller: _avatarUrl,
                   decoration: const InputDecoration(
@@ -163,19 +167,21 @@ class _OnboardingViewState extends State<_OnboardingView> {
                     labelText: 'Assistant name',
                   ),
                 ),
+                const SizedBox(height: SophiaSpace.md),
                 TextField(
                   controller: _communicationStyle,
                   decoration: const InputDecoration(
                     labelText: 'Communication style',
                   ),
                 ),
+                const SizedBox(height: SophiaSpace.md),
                 TextField(
                   controller: _preferredLanguage,
                   decoration: const InputDecoration(
                     labelText: 'Preferred language',
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: SophiaSpace.md),
                 DropdownButtonFormField<ProactivityLevel>(
                   key: ValueKey('proactivity_${_proactivity.value}'),
                   initialValue: _proactivity,
@@ -192,6 +198,7 @@ class _OnboardingViewState extends State<_OnboardingView> {
                           setState(() => _proactivity = v!);
                         },
                 ),
+                const SizedBox(height: SophiaSpace.md),
                 DropdownButtonFormField<AutonomyLevel>(
                   key: ValueKey('autonomy_${_autonomy.value}'),
                   initialValue: _autonomy,
@@ -224,11 +231,13 @@ class _OnboardingViewState extends State<_OnboardingView> {
                   'Proposal-only: Sofia suggests; you confirm actions.',
                   style: Theme.of(context).textTheme.labelSmall,
                 ),
+                const SizedBox(height: SophiaSpace.sm),
                 _SettingToggle(
                   label: 'Memory enabled',
                   value: _memory,
                   onChanged: busy ? null : (v) => setState(() => _memory = v),
                 ),
+                const SizedBox(height: SophiaSpace.xs),
                 _SettingToggle(
                   label: 'Reminders enabled',
                   value: _reminders,
@@ -236,6 +245,7 @@ class _OnboardingViewState extends State<_OnboardingView> {
                       ? null
                       : (v) => setState(() => _reminders = v),
                 ),
+                const SizedBox(height: SophiaSpace.xs),
                 _SettingToggle(
                   label: 'Planning enabled',
                   value: _planning,

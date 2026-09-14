@@ -143,11 +143,10 @@ class AppRouter {
                 currentIndex: shell.currentIndex,
                 children: children,
               ),
-          pageBuilder: (context, state, navigationShell) => _detail(
-            context,
-            state,
-            MainWrapper(navigationShell: navigationShell),
-          ),
+          builder: (context, state, navigationShell) =>
+              SophiaSheetBackdrop(
+                child: MainWrapper(navigationShell: navigationShell),
+              ),
           branches: [
             StatefulShellBranch(
               routes: [
@@ -210,7 +209,7 @@ class AppRouter {
           children: [
             Positioned.fill(
               child: Opacity(
-                opacity: incoming.value,
+                opacity: incoming.value.clamp(0.0, 1.0),
                 child: Transform.translate(
                   offset: Offset(
                     SophiaMotion.hierarchicalEnterOffset *
