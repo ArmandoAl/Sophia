@@ -10,6 +10,17 @@ El objetivo declarado del proyecto es la **simbiosis**: que el asistente llegue 
 al usuario lo bastante como para hacer cosas por él sin pedirle permiso cada vez, sin que
 eso se sienta invasivo ni impredecible.
 
+<p align="center">
+  <img src="docs/screenshots/01-chat.png" width="190" alt="Chat con Sofía: una petición en lenguaje natural se convierte en una actividad y un recordatorio">
+  <img src="docs/screenshots/02-ajustes.png" width="190" alt="Ajustes: la sección de aprendizaje da acceso a lo que Sofía sabe, contextos, personas e importación">
+  <img src="docs/screenshots/03-diagnostico.png" width="190" alt="Diagnóstico: estado del backend y del worker de aprendizaje de los últimos siete días">
+  <img src="docs/screenshots/04-privacidad.png" width="190" alt="Privacidad y datos: exportación completa y solicitud de borrado">
+  <img src="docs/screenshots/05-importar.png" width="190" alt="Importar conversaciones: aviso de consentimiento antes de procesar mensajes de terceros">
+</p>
+<p align="center">
+  <sub>Chat &nbsp;·&nbsp; Ajustes &nbsp;·&nbsp; Diagnóstico &nbsp;·&nbsp; Privacidad &nbsp;·&nbsp; Importar conversaciones</sub>
+</p>
+
 ---
 
 ## Índice

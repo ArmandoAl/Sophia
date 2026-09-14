@@ -303,7 +303,7 @@ cd Sophia-public && rm -rf .git
 
 # 2. Quita lo específico de tu proyecto
 rm -f sophia_ai_backend/sofia-backend/.firebaserc
-rm -rf sophia_ai_design/              # capturas con tu diseño real; ponlas en el README
+rm -rf sophia_ai_design/              # capturas originales sin procesar; docs/screenshots/ sí se queda
 rm -rf docs/runbook_*.md              # contienen tus IDs y URLs
 rm -rf sophia_ai_backend/docs/        # duplicado con reportes de sprint internos
 
