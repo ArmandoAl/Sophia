@@ -155,6 +155,22 @@ toca), continuidad (los elementos que persisten se transforman, no reaparecen), 
 iOS, Android y macOS. La configuración de iOS usa Swift Package Manager tras la migración
 a UIScene. El bundle ID es `com.aial.sophiav1`.
 
+### Demo web
+
+El cliente compila para Web en modo JavaScript. Para ejecutarlo o generar el artefacto:
+
+```bash
+fvm flutter run -d chrome --dart-define=DEMO_MODE=true
+fvm flutter build web --release --dart-define=DEMO_MODE=true
+```
+
+La demo usa únicamente datos ficticios y estado en memoria; omite el service locator,
+sesión, API, almacenamiento de tokens y Firebase Messaging. La respuesta del chat está
+escrita como ejemplo, no la genera una IA. `flutter_secure_storage` tiene implementación
+web, pero es incompatible con la compilación WebAssembly de Flutter; la build JavaScript
+anterior funciona. El Firebase Hosting configurado en el subrepositorio backend reescribe
+todas las rutas hacia Go y no está preparado para servir este cliente estático.
+
 ---
 
 ## Convenciones

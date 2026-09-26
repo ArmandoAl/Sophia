@@ -6,9 +6,16 @@ import 'package:sophia_ai/core/di/service_locator.dart';
 import 'package:sophia_ai/core/router/app_router.dart';
 import 'package:sophia_ai/core/theme/app_theme.dart';
 import 'package:sophia_ai/features/session/presentation/cubit/session_cubit.dart';
+import 'package:sophia_ai/demo/demo_app.dart';
+
+const demoMode = bool.fromEnvironment('DEMO_MODE', defaultValue: false);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (demoMode) {
+    runApp(const DemoApp());
+    return;
+  }
   await initDependencies();
   final sessionCubit = sl<SessionCubit>();
   unawaited(sessionCubit.bootstrap());
