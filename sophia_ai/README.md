@@ -164,12 +164,13 @@ fvm flutter run -d chrome --dart-define=DEMO_MODE=true
 fvm flutter build web --release --dart-define=DEMO_MODE=true
 ```
 
-La demo usa únicamente datos ficticios y estado en memoria; omite el service locator,
-sesión, API, almacenamiento de tokens y Firebase Messaging. La respuesta del chat está
-escrita como ejemplo, no la genera una IA. `flutter_secure_storage` tiene implementación
-web, pero es incompatible con la compilación WebAssembly de Flutter; la build JavaScript
-anterior funciona. El Firebase Hosting configurado en el subrepositorio backend reescribe
-todas las rutas hacia Go y no está preparado para servir este cliente estático.
+La demo conserva el tema, navegación, chat, actividades, creencias y tarjeta de propuestas
+del cliente. Sus repositorios usan datos ficticios en memoria y una conversación guiada;
+rechazar abre alternativas y aprobar añade una actividad local. Las respuestas no las
+genera una IA. El modo demo evita llamadas al backend, credenciales, Firebase Messaging,
+exportaciones y acciones externas. El sitio público usa la configuración de Firebase
+Hosting de este directorio, separada del hosting del backend. `flutter_secure_storage`
+tiene implementación web, pero bloquea el build WebAssembly; JavaScript compila bien.
 
 ---
 

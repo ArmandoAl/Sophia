@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sophia_ai/core/config/demo_mode.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../domain/models.dart';
@@ -15,6 +16,10 @@ class PrivacyCubit extends Cubit<String?> {
   final SettingsServicesRepository _repository;
 
   Future<void> export() async {
+    if (demoMode) {
+      emit('La exportación está desactivada en esta demo.');
+      return;
+    }
     emit(null);
     try {
       final bytes = utf8.encode(
@@ -39,6 +44,10 @@ class PrivacyCubit extends Cubit<String?> {
   }
 
   Future<bool> requestDeletion() async {
+    if (demoMode) {
+      emit('La eliminación está desactivada en esta demo.');
+      return false;
+    }
     emit(null);
     try {
       await _repository.requestDeletion();
@@ -70,6 +79,7 @@ class NotificationsCubit extends Cubit<NotificationsState> {
   final SettingsServicesRepository _repository;
 
   Future<void> load() async {
+    if (demoMode) return;
     emit(
       NotificationsState(
         devices: state.devices,
@@ -97,6 +107,7 @@ class NotificationsCubit extends Cubit<NotificationsState> {
   }
 
   Future<void> register() async {
+    if (demoMode) return;
     try {
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp();
@@ -132,6 +143,7 @@ class NotificationsCubit extends Cubit<NotificationsState> {
   }
 
   Future<void> remove(String id) async {
+    if (demoMode) return;
     await _repository.removeDevice(id);
     await load();
   }

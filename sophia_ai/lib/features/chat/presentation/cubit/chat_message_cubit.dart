@@ -1,9 +1,11 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:sophia_ai/core/models/models.dart';
 import 'package:sophia_ai/core/network/api_exception.dart';
+import 'package:sophia_ai/core/config/demo_mode.dart';
 import 'package:sophia_ai/features/chat/domain/conversations_repository.dart';
 import 'package:sophia_ai/features/chat/domain/entities/chat_message.dart';
 import 'package:sophia_ai/features/chat/presentation/cubit/chat_message_state.dart';
+import 'package:sophia_ai/demo/demo_store.dart';
 
 class ChatMessageCubit extends Cubit<ChatMessageState> {
   ChatMessageCubit({required ConversationsRepository repository})
@@ -33,6 +35,7 @@ class ChatMessageCubit extends Cubit<ChatMessageState> {
               .toList()
               .reversed
               .toList(),
+          suggestedReplies: list.suggestedReplies,
           isLoading: false,
           clearError: true,
         ),
@@ -53,7 +56,13 @@ class ChatMessageCubit extends Cubit<ChatMessageState> {
       if (conversation == null) return;
     }
 
-    emit(state.copyWith(isTyping: true, clearError: true));
+    emit(
+      state.copyWith(
+        isTyping: true,
+        clearError: true,
+        suggestedReplies: const [],
+      ),
+    );
     try {
       final response = await _repository.sendMessage(
         conversation.id,
@@ -78,6 +87,7 @@ class ChatMessageCubit extends Cubit<ChatMessageState> {
           clearError: true,
           activeEntity: response.activeEntity,
           contextChanged: response.contextChanged,
+          suggestedReplies: response.suggestedReplies,
         ),
       );
     } catch (e) {
@@ -107,6 +117,37 @@ class ChatMessageCubit extends Cubit<ChatMessageState> {
         clearActiveEntity: true,
         clearManualContext: true,
         contextChanged: false,
+      ),
+    );
+  }
+
+  void demoProposalRejected() {
+    if (!demoMode) return;
+    _appendDemoMessage(
+      'Entiendo. ¿Qué te gustaría cambiar para que te funcione mejor?',
+      DemoStore.instance.retryReplies,
+    );
+  }
+
+  void demoProposalApproved(String title) {
+    if (!demoMode) return;
+    _appendDemoMessage(
+      'Listo. “$title” ya aparece en Actividades de esta demo.',
+      const [],
+    );
+  }
+
+  void _appendDemoMessage(String text, List<String> replies) {
+    final message = ChatMessage(
+      id: 'demo-local-${DateTime.now().microsecondsSinceEpoch}',
+      text: text,
+      isUser: false,
+      timestamp: DateTime.now(),
+    );
+    emit(
+      state.copyWith(
+        messages: [message, ...state.messages],
+        suggestedReplies: replies,
       ),
     );
   }

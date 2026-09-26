@@ -5,10 +5,12 @@ class ConversationListResponse {
   const ConversationListResponse({
     required this.conversations,
     this.nextCursor,
+    this.suggestedReplies = const [],
   });
 
   final List<Conversation> conversations;
   final String? nextCursor;
+  final List<String> suggestedReplies;
 
   factory ConversationListResponse.fromJson(Map<String, dynamic> json) {
     return ConversationListResponse(
@@ -16,6 +18,9 @@ class ConversationListResponse {
           .map((item) => Conversation.fromJson(item as Map<String, dynamic>))
           .toList(),
       nextCursor: json['next_cursor'] as String?,
+      suggestedReplies:
+          (json['suggested_replies'] as List<dynamic>? ?? const [])
+              .cast<String>(),
     );
   }
 }
@@ -82,6 +87,7 @@ class SendConversationMessageResponse {
     this.runtimeRequestId,
     this.activeEntity,
     this.contextChanged = false,
+    this.suggestedReplies = const [],
   });
 
   final Conversation conversation;
@@ -91,6 +97,7 @@ class SendConversationMessageResponse {
   final String? runtimeRequestId;
   final EntityReference? activeEntity;
   final bool contextChanged;
+  final List<String> suggestedReplies;
 
   factory SendConversationMessageResponse.fromJson(Map<String, dynamic> json) {
     return SendConversationMessageResponse(
@@ -116,6 +123,9 @@ class SendConversationMessageResponse {
             )
           : null,
       contextChanged: json['context_changed'] as bool? ?? false,
+      suggestedReplies:
+          (json['suggested_replies'] as List<dynamic>? ?? const [])
+              .cast<String>(),
     );
   }
 }

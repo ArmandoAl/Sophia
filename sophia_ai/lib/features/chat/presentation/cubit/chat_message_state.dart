@@ -12,6 +12,7 @@ class ChatMessageState extends Equatable {
   final EntityReference? activeEntity;
   final String? manualContext;
   final bool contextChanged;
+  final List<String> suggestedReplies;
 
   const ChatMessageState({
     this.conversation,
@@ -23,6 +24,7 @@ class ChatMessageState extends Equatable {
     this.activeEntity,
     this.manualContext,
     this.contextChanged = false,
+    this.suggestedReplies = const [],
   });
 
   ChatMessageState copyWith({
@@ -36,6 +38,7 @@ class ChatMessageState extends Equatable {
     EntityReference? activeEntity,
     String? manualContext,
     bool? contextChanged,
+    List<String>? suggestedReplies,
     bool clearActiveEntity = false,
     bool clearManualContext = false,
   }) {
@@ -53,6 +56,7 @@ class ChatMessageState extends Equatable {
           ? null
           : manualContext ?? this.manualContext,
       contextChanged: contextChanged ?? this.contextChanged,
+      suggestedReplies: suggestedReplies ?? this.suggestedReplies,
     );
   }
 
@@ -67,5 +71,6 @@ class ChatMessageState extends Equatable {
     activeEntity,
     manualContext,
     contextChanged,
+    suggestedReplies,
   ];
 }

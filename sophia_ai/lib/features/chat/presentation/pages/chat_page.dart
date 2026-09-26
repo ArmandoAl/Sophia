@@ -140,10 +140,76 @@ class _ChatView extends StatelessWidget {
             },
           ),
         ),
+        const _SuggestedReplies(),
         const _ChatInput(),
       ],
     ),
   );
+}
+
+class _SuggestedReplies extends StatelessWidget {
+  const _SuggestedReplies();
+
+  @override
+  Widget build(BuildContext context) =>
+      BlocBuilder<ChatMessageCubit, ChatMessageState>(
+        buildWhen: (before, after) =>
+            before.suggestedReplies != after.suggestedReplies ||
+            before.isTyping != after.isTyping,
+        builder: (context, state) {
+          if (state.suggestedReplies.isEmpty || state.isTyping) {
+            return const SizedBox.shrink();
+          }
+          return AnimatedSize(
+            duration: SophiaMotion.resolve(context, SophiaMotion.short),
+            curve: SophiaMotion.contentCurve,
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(
+                SophiaSpace.md,
+                SophiaSpace.sm,
+                SophiaSpace.md,
+                SophiaSpace.xs,
+              ),
+              decoration: BoxDecoration(
+                color: context.colors.elevated,
+                border: Border(top: BorderSide(color: context.colors.line)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Puedes responder',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: context.colors.softInk,
+                    ),
+                  ),
+                  const SizedBox(height: SophiaSpace.xs),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final reply in state.suggestedReplies)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              right: SophiaSpace.xs,
+                            ),
+                            child: ActionChip(
+                              label: Text(reply),
+                              onPressed: () => context
+                                  .read<ChatMessageCubit>()
+                                  .sendMessage(reply),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
 }
 
 class _ActiveContextBar extends StatelessWidget {
@@ -383,6 +449,7 @@ class _MessageItem extends StatelessWidget {
       );
     }).toList();
     final executionEnabled = sl<FeatureFlags>().aiActionExecutionEnabled;
+    final chatCubit = context.read<ChatMessageCubit>();
     final heroTag = 'proposal-${message.id}';
     return Hero(
       tag: heroTag,
@@ -403,6 +470,7 @@ class _MessageItem extends StatelessWidget {
                   decisionLatencyMs: decisionLatencyMs,
                 );
                 await repository.execute(action.id);
+                chatCubit.demoProposalApproved(action.label);
               },
           onReject:
               (
@@ -416,6 +484,7 @@ class _MessageItem extends StatelessWidget {
                   rejectionReason: rejectionReason,
                   decisionLatencyMs: decisionLatencyMs,
                 );
+                chatCubit.demoProposalRejected();
               },
         ),
       ),
