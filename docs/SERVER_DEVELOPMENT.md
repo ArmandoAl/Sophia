@@ -43,3 +43,8 @@ Los procesos no persisten tras reiniciar el servidor.
 | En el servidor / navegador | Necesita credenciales, dispositivo real o Mac |
 | --- | --- |
 | Core, cubits, build Jaspr, flujo de la demo en navegador, accesibilidad claro/oscuro, 390 px | Backend real (login/CORS), Firebase Messaging, notificaciones, iOS/Android reales |
+
+## Publicar para ver desde cualquier lugar (Firebase Hosting, canal de vista previa)
+`scripts/deploy_preview.sh [canal]` compila `apps/web` en **modo demo** (datos ficticios, sin secretos) y lo sube a un canal de vista previa del
+sitio `sophia-ai-demo` (proyecto `sophia-ai-60e87`), URL temporal de 7 días y `noindex`. No toca el sitio en producción (Flutter Web de la demo).
+Requiere `firebase login --no-localhost` una vez. Configuración en `firebase.jaspr.json`.
