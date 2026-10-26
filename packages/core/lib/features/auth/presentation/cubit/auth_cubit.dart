@@ -1,4 +1,4 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:bloc/bloc.dart';
 
 import 'package:sophia_core/core/models/auth/login_request.dart';
 import 'package:sophia_core/core/models/auth/register_request.dart';

@@ -1,0 +1,26 @@
+name: sophia_web
+description: "Interfaz Jaspr de Sophia: sesión y conversación, en modo demo o con la API real."
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.10.0
+
+resolution: workspace
+
+dependencies:
+  bloc: ^9.2.0
+  jaspr: ^0.23.4
+  sophia_core:
+  web: ^1.1.1
+
+dev_dependencies:
+  build_runner: ^2.10.0
+  build_web_compilers: 4.8.5
+  jaspr_builder: ^0.23.4
+  lints: ^5.0.0
+  test: ^1.31.1
+
+jaspr:
+  mode: client
+  port: 7703

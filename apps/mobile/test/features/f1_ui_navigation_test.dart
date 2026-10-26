@@ -8,7 +8,7 @@ import 'package:sophia_ai/core/router/session_redirect.dart';
 import 'package:sophia_core/core/storage/token_storage.dart';
 import 'package:sophia_ai/core/theme/app_theme.dart';
 import 'package:sophia_core/features/auth/domain/auth_repository.dart';
-import 'package:sophia_ai/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:sophia_core/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:sophia_ai/features/auth/presentation/pages/login_screen.dart';
 import 'package:sophia_ai/features/auth/presentation/pages/register_screen.dart';
 import 'package:sophia_core/features/session/presentation/cubit/session_cubit.dart';

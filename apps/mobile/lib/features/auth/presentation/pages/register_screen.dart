@@ -7,8 +7,8 @@ import 'package:sophia_ai/core/widgets/auth_scaffold.dart';
 import 'package:sophia_ai/core/widgets/neon_button.dart';
 import 'package:sophia_ai/core/theme/design_tokens.dart';
 import 'package:sophia_ai/core/widgets/motion/motion_widgets.dart';
-import 'package:sophia_ai/features/auth/presentation/cubit/auth_cubit.dart';
-import 'package:sophia_ai/features/auth/presentation/cubit/auth_state.dart';
+import 'package:sophia_core/features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:sophia_core/features/auth/presentation/cubit/auth_state.dart';
 
 /// Register screen.
 ///

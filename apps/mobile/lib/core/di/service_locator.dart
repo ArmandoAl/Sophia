@@ -5,7 +5,7 @@ import 'package:sophia_core/features/actions/data/action_proposals_repository_im
 import 'package:sophia_core/features/actions/domain/action_proposals_repository.dart';
 import 'package:sophia_core/features/auth/data/auth_repository_impl.dart';
 import 'package:sophia_core/features/auth/domain/auth_repository.dart';
-import '../../features/auth/presentation/cubit/auth_cubit.dart';
+import 'package:sophia_core/features/auth/presentation/cubit/auth_cubit.dart';
 import 'package:sophia_core/features/beliefs/data/beliefs_repository_impl.dart';
 import 'package:sophia_core/features/beliefs/domain/beliefs_repository.dart';
 import '../../features/beliefs/presentation/cubit/beliefs_cubit.dart';
