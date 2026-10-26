@@ -36,3 +36,8 @@ sophia_ai/windows/flutter/ephemeral/
 # --- IDE ---
 .idea/
 *.iml
+.dart_tool/
+build/
+.fvm/
+*.log
+node_modules/

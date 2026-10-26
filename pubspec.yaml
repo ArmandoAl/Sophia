@@ -1,0 +1,7 @@
+name: sophia_workspace
+publish_to: none
+environment:
+  sdk: ^3.9.2
+workspace:
+  - packages/core
+  - apps/mobile

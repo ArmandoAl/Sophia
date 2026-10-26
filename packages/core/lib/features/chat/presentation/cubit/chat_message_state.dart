@@ -1,0 +1,76 @@
+import 'package:equatable/equatable.dart';
+import 'package:sophia_core/core/models/models.dart';
+import 'package:sophia_core/features/chat/domain/entities/chat_message.dart';
+
+class ChatMessageState extends Equatable {
+  final Conversation? conversation;
+  final List<ChatMessage> messages;
+  final bool isLoading;
+  final bool isListening; // Para la animación de ondas de voz (screen3)
+  final bool isTyping; // Para mostrar "Sophia is typing..."
+  final String? errorMessage;
+  final EntityReference? activeEntity;
+  final String? manualContext;
+  final bool contextChanged;
+  final List<String> suggestedReplies;
+
+  const ChatMessageState({
+    this.conversation,
+    this.messages = const [],
+    this.isLoading = false,
+    this.isListening = false,
+    this.isTyping = false,
+    this.errorMessage,
+    this.activeEntity,
+    this.manualContext,
+    this.contextChanged = false,
+    this.suggestedReplies = const [],
+  });
+
+  ChatMessageState copyWith({
+    Conversation? conversation,
+    List<ChatMessage>? messages,
+    bool? isLoading,
+    bool? isListening,
+    bool? isTyping,
+    String? errorMessage,
+    bool clearError = false,
+    EntityReference? activeEntity,
+    String? manualContext,
+    bool? contextChanged,
+    List<String>? suggestedReplies,
+    bool clearActiveEntity = false,
+    bool clearManualContext = false,
+  }) {
+    return ChatMessageState(
+      conversation: conversation ?? this.conversation,
+      messages: messages ?? this.messages,
+      isLoading: isLoading ?? this.isLoading,
+      isListening: isListening ?? this.isListening,
+      isTyping: isTyping ?? this.isTyping,
+      errorMessage: clearError ? null : errorMessage ?? this.errorMessage,
+      activeEntity: clearActiveEntity
+          ? null
+          : activeEntity ?? this.activeEntity,
+      manualContext: clearManualContext
+          ? null
+          : manualContext ?? this.manualContext,
+      contextChanged: contextChanged ?? this.contextChanged,
+      suggestedReplies: suggestedReplies ?? this.suggestedReplies,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    conversation,
+    messages,
+    isLoading,
+    isListening,
+    isTyping,
+    errorMessage,
+    activeEntity,
+    manualContext,
+    contextChanged,
+    suggestedReplies,
+  ];
+}
